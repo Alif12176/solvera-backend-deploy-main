@@ -1,0 +1,48 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+from uuid import UUID
+
+class ORMBase(BaseModel):
+    class Config:
+        from_attributes = True 
+
+class FeatureTabItem(ORMBase):
+    id: Optional[UUID] = None 
+    section_title: Optional[str] = None
+    section_subtitle: Optional[str] = None
+    tab_label: str
+    content_title: str
+    content_description: Optional[str] = None 
+    benefits: Optional[List[str]] = [] 
+    sequence: int 
+
+class WhyUsCardItem(ORMBase):
+    id: Optional[UUID] = None
+    section_title: Optional[str] = None
+    section_subtitle: Optional[str] = None
+    icon: Optional[str] = None
+    card_label: Optional[str] = None
+    sequence: Optional[int] = None
+
+class FAQItem(ORMBase):
+    id: Optional[UUID] = None
+    question: str
+    answer: str
+    sequence: Optional[int] = None
+
+class ProductSchema(ORMBase):
+    id: UUID 
+    slug: str
+    name: str
+    category: Optional[str] = None
+    
+    hero_title: str
+    hero_subtitle: Optional[str] = None
+    
+    features: List[FeatureTabItem] = [] 
+    why_us: List[WhyUsCardItem] = []
+    faqs: List[FAQItem] = []
+    
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
