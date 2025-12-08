@@ -1,33 +1,39 @@
 from uuid import uuid4
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer, Table
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+
+article_categories = Table(
+    'article_categories',
+    Base.metadata,
+    Column('article_id', UUID(as_uuid=True), ForeignKey('articles.id'), primary_key=True),
+    Column('category_id', Integer, ForeignKey('categories.id'), primary_key=True)
+)
 
 # 1. Tabel Authors
 class Author(Base):
     __tablename__ = "authors"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    id = Column(Integer, primary_key=True, index=True) 
     name = Column(String, nullable=False)
-    photo_url = Column(String, nullable=True)
-
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    articles = relationship("Article", back_populates="author")
+    articles = relationship("Article", back_populates="publisher")
 
 # 2. Tabel Categories
 class Category(Base):
     __tablename__ = "categories"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    name = Column(String, nullable=False, unique=True) # Contoh: "Berita", "Tutorial"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, unique=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    articles = relationship("Article", back_populates="category")
+    articles = relationship("Article", secondary=article_categories, back_populates="categories")
 
 # 3. Tabel Articles
 class Article(Base):
@@ -35,20 +41,17 @@ class Article(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
-    author_id = Column(UUID(as_uuid=True), ForeignKey("authors.id"), nullable=False)
-    category_id = Column(UUID(as_uuid=True), ForeignKey("categories.id"), nullable=False)
-
-    # Content
+    publisher_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
     title = Column(String, nullable=False)
     slug = Column(String, unique=True, index=True, nullable=False)
-    summary = Column(Text, nullable=True)   
-    content = Column(Text, nullable=False)     
-    image = Column(String, nullable=True)    
-
-    # Timestamps
+    summary = Column(Text, nullable=True)
+    content = Column(Text, nullable=False)
+    image_url = Column(String, nullable=True) 
+    
+    # Metadata
+    published_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relasi Balik
-    author = relationship("Author", back_populates="articles")
-    category = relationship("Category", back_populates="articles")
+    publisher = relationship("Author", back_populates="articles")
+    categories = relationship("Category", secondary=article_categories, back_populates="articles")

@@ -1,24 +1,29 @@
 from sqlalchemy.orm import Session, joinedload
 from app.models.blog import Article
+from typing import List, Optional
 
-def get_article_by_slug(db: Session, slug: str):
+def get_article_by_slug(db: Session, slug: str) -> Optional[Article]:
     """
-    Mengambil 1 artikel lengkap dengan data Author dan Category-nya.
+    Fetch a single article by slug.
     """
     article = db.query(Article).options(
-        joinedload(Article.author),
-        joinedload(Article.category)
+        joinedload(Article.publisher), 
+        joinedload(Article.categories) 
     ).filter(Article.slug == slug).first()
 
     return article
 
-def get_latest_articles(db: Session, limit: int = 5):
+def get_latest_articles(db: Session, limit: int = 10, offset: int = 0) -> List[Article]:
     """
-    Mengambil list artikel terbaru untuk homepage/sidebar.
+    Fetch a list of latest published articles with pagination.
     """
     articles = db.query(Article).options(
-        joinedload(Article.author),
-        joinedload(Article.category)
-    ).order_by(Article.created_at.desc()).limit(limit).all()
+        joinedload(Article.publisher),
+        joinedload(Article.categories)
+    ).filter(
+        Article.published_at.isnot(None)
+    ).order_by(
+        Article.published_at.desc()    
+    ).offset(offset).limit(limit).all()
 
     return articles
