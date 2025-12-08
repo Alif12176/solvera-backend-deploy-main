@@ -1,0 +1,50 @@
+# =======================================================
+# 1. SECRETS & ENVIRONMENT (CRITICAL)
+# =======================================================
+# Ignore all .env files to prevent leaking API Keys & DB URLs
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Allow .env.example so other devs know what variables are needed
+!.env.example
+
+# =======================================================
+# 2. PYTHON & VIRTUAL ENVIRONMENT
+# =======================================================
+# Compiled python modules
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+
+# =======================================================
+# 3. IDE & SYSTEM FILES
+# =======================================================
+# VS Code settings (optional, but usually personal)
+.vscode/
+
+# Mac OS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# PyCharm / IntelliJ
+.idea/
+
+# =======================================================
+# 4. VERCEL & DEPLOYMENT
+# =======================================================
+.vercel/

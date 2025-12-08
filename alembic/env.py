@@ -5,10 +5,10 @@ from sqlalchemy import pool
 
 from alembic import context
 
-# 1. IMPORT PENTING DARI APP ANDA
 # Base untuk metadata, Product agar model terbaca, Settings untuk URL Database
 from app.db.base import Base
 from app.models.product import Product 
+from app.models.blog import Article, Category, Author
 from app.core.config import settings   
 
 # this is the Alembic Config object, which provides
@@ -20,14 +20,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 2. SETTING URL DATABASE
-# Kita menimpa konfigurasi di alembic.ini dengan URL dari settings (file .env)
-# Ini penting agar koneksi menggunakan credential dari Neon Vercel
+# SETTING URL DATABASE
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-# 3. SETTING METADATA
-# Ubah dari None menjadi Base.metadata
-# Ini agar autogenerate bisa mendeteksi model Product Anda
+# SETTING METADATA
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
