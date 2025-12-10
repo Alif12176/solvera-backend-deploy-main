@@ -31,3 +31,7 @@ class PaginatedArticleResponse(BaseModel):
     page: int
     limit: int
     has_more: bool
+
+class CategoryListResponse(BaseModel):
+    items: List[CategoryItem]
+    count: int
