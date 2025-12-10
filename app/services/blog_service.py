@@ -1,29 +1,37 @@
 from sqlalchemy.orm import Session, joinedload
-from app.models.blog import Article
-from typing import List, Optional
+from sqlalchemy import func
+from app.models.blog import Article, Category
+from typing import List, Optional, Tuple
 
 def get_article_by_slug(db: Session, slug: str) -> Optional[Article]:
-    """
-    Fetch a single article by slug.
-    """
-    article = db.query(Article).options(
+    return db.query(Article).options(
         joinedload(Article.publisher), 
         joinedload(Article.categories) 
     ).filter(Article.slug == slug).first()
 
-    return article
-
-def get_latest_articles(db: Session, limit: int = 10, offset: int = 0) -> List[Article]:
-    """
-    Fetch a list of latest published articles with pagination.
-    """
-    articles = db.query(Article).options(
+def get_articles(
+    db: Session, 
+    limit: int = 10, 
+    offset: int = 0, 
+    category_slug: Optional[str] = None
+) -> Tuple[List[Article], int]:
+    query = db.query(Article).options(
         joinedload(Article.publisher),
         joinedload(Article.categories)
     ).filter(
         Article.published_at.isnot(None)
-    ).order_by(
-        Article.published_at.desc()    
+    )
+
+    if category_slug:
+        query = query.join(Article.categories).filter(Category.slug == category_slug)
+
+    total = query.count()
+
+    articles = query.order_by(
+        Article.published_at.desc()
     ).offset(offset).limit(limit).all()
 
-    return articles
+    return articles, total
+
+def get_categories(db: Session) -> List[Category]:
+    return db.query(Category).order_by(Category.name.asc()).all()
