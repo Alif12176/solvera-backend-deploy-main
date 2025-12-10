@@ -1,54 +1,53 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.services.blog_service import get_article_by_slug, get_articles, get_categories
-from app.schemas.v1.blog_schema import ArticleSchema, ArticleListResponse, CategoryItem
+from app.services.blog_service import get_article_by_slug, get_latest_articles
+from app.schemas.v1.blog_schema import ArticleSchema, PaginatedArticleResponse
 from app.schemas.common import APIResponse
-from typing import List, Optional
 
 router = APIRouter()
 
 @router.get(
     "/articles", 
-    response_model=APIResponse[ArticleListResponse],
+    response_model=APIResponse[PaginatedArticleResponse],
     summary="Get List of Articles",
-    description="Retrieve paginated articles. Can be filtered by category slug."
+    description="Retrieve latest articles with pagination. Used for Blog Landing Page.",
+    response_description="A list of articles with author and category details."
 )
-def list_articles(
+def get_articles_list(
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(10, ge=1, le=100, description="Items per page"),
-    category: Optional[str] = Query(None, description="Filter by category slug (e.g., 'saham')"),
+    limit: int = Query(6, ge=1, le=50, description="Items per page"),
     db: Session = Depends(get_db)
 ):
     offset = (page - 1) * limit
-    items, total = get_articles(db, limit=limit, offset=offset, category_slug=category)
-    
-    data = ArticleListResponse(
-        items=items,
-        total=total,
+    articles = get_latest_articles(db, limit=limit + 1, offset=offset)
+
+    has_more = False
+    if len(articles) > limit:
+        has_more = True
+        articles = articles[:limit]
+
+    data = PaginatedArticleResponse(
+        items=articles,
         page=page,
-        limit=limit
+        limit=limit,
+        has_more=has_more
     )
+    
     return APIResponse(success=True, data=data, error=None)
 
 @router.get(
     "/articles/{slug}", 
     response_model=APIResponse[ArticleSchema],
     summary="Get Article Detail",
-    description="Retrieve full details of a single article by its slug."
+    description="Retrieve full details of an article by its slug.",
+    response_description="Single article object with full content."
 )
-def get_article(slug: str, db: Session = Depends(get_db)):
+def get_article_detail(
+    slug: str, 
+    db: Session = Depends(get_db)
+):
     article = get_article_by_slug(db, slug)
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
     return APIResponse(success=True, data=article, error=None)
-
-@router.get(
-    "/categories",
-    response_model=APIResponse[List[CategoryItem]],
-    summary="Get All Categories",
-    description="Retrieve a list of all available blog categories/topics."
-)
-def list_categories(db: Session = Depends(get_db)):
-    categories = get_categories(db)
-    return APIResponse(success=True, data=categories, error=None)

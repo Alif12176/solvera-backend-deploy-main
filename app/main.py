@@ -11,8 +11,8 @@ tags_metadata = [
         "description": "Health check and root connectivity endpoints.",
     },
     {
-        "name": "Products & Solutions",
-        "description": "Endpoints to fetch product details (ERP, CRM) and Solutions.",
+        "name": "Products",
+        "description": "Endpoints to fetch product details.",
     },
     {
         "name": "Blogs & Articles",
@@ -34,7 +34,7 @@ async def root():
 app.include_router(
     product_v1.router, 
     prefix="/api/v1", 
-    tags=["Products & Solutions"]
+    tags=["Products"]
 )
 
 app.include_router(
