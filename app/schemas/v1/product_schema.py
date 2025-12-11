@@ -46,3 +46,13 @@ class ProductSchema(ORMBase):
     
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+class PaginationMeta(BaseModel):
+    page: int
+    limit: int
+    total_items: int
+    total_pages: int
+
+class ProductListResponse(BaseModel):
+    items: List[ProductSchema]
+    meta: PaginationMeta
