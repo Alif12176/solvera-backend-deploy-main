@@ -2,8 +2,9 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from app.routers.v1 import product as product_v1
-from app.routers.v1 import blog as blog_v1 
+from app.routers.v1 import blog as blog_v1
 
 tags_metadata = [
     {
@@ -15,33 +16,34 @@ tags_metadata = [
         "description": "Endpoints to fetch product details.",
     },
     {
-        "name": "Blogs & Articles",
+        "name": "Blogs",
         "description": "Endpoints for retrieving news, articles, authors, and categories.",
     },
 ]
 
 app = FastAPI(
     title="Solvera Corporate Website API",
-    description="Backend API for Solvera Corporate Website (Next.js)",
+    description="Backend API for Solvera Corporate Website",
     version="1.0.0",
     openapi_tags=tags_metadata
 )
 
-@app.get("/", tags=["General"])
-async def root():
-    return {"status": "ok", "message": "Solvera Backend is running"}
+origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "*"
+]
 
-app.include_router(
-    product_v1.router, 
-    prefix="/api/v1", 
-    tags=["Products"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-app.include_router(
-    blog_v1.router, 
-    prefix="/api/v1", 
-    tags=["Blogs & Articles"]
-)
+app.include_router(product_v1.router, prefix="/api/v1", tags=["Products"])
+app.include_router(blog_v1.router, prefix="/api/v1", tags=["Blogs"])
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -72,3 +74,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             }
         },
     )
+
+@app.get("/", tags=["General"])
+async def root():
+    return {"status": "ok", "message": "Solvera Backend is running"}
