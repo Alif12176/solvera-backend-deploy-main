@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from app.models.solution import Solution, SolutionRelatedProduct
+from app.models.solutions import Solution, SolutionRelatedProduct
 from app.schemas.v1.solusi_schema import (
     Solution as SolutionSchema, 
     CoreBenefit, CoreValue, IndustrySection, IndustryItem, 

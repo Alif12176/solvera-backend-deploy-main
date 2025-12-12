@@ -5,6 +5,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers.v1 import product as product_v1
 from app.routers.v1 import blog as blog_v1
+from app.routers.v1 import solution as solution_v1
 
 tags_metadata = [
     {
@@ -18,6 +19,10 @@ tags_metadata = [
     {
         "name": "Blogs",
         "description": "Endpoints for retrieving news, articles, authors, and categories.",
+    },
+    {
+        "name": "Solutions",
+        "description": "Endpoints for fetching Solution pages.",
     },
 ]
 
@@ -43,6 +48,7 @@ app.add_middleware(
 
 app.include_router(product_v1.router, prefix="/api/v1", tags=["Products"])
 app.include_router(blog_v1.router, prefix="/api/v1", tags=["Blogs"])
+app.include_router(solution_v1.router, prefix="/api/v1/solutions", tags=["Solutions"])
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
