@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 from app.models.product import Product
-from sqlalchemy import func, or_
+from sqlalchemy import func
 
 def get_product_list(
     db: Session, 
@@ -16,18 +16,25 @@ def get_product_list(
         query = query.filter(func.lower(Product.category) == category.lower())
 
     if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Product.name.ilike(search_term),
-                Product.hero_title.ilike(search_term),
-                Product.hero_subtitle.ilike(search_term),
-                Product.slug.ilike(search_term)
-            )
+        search_term_wildcard = f"%{search}%"
+        
+        search_expression = func.concat(
+            func.coalesce(Product.name, ''), ' ', 
+            func.coalesce(Product.hero_title, ''), ' ', 
+            func.coalesce(Product.hero_subtitle, '')
         )
+        query = query.filter(search_expression.ilike(search_term_wildcard))
+        
+        query = query.order_by(
+            Product.name.op('<->')(search),
+            Product.hero_title.op('<->')(search),
+            Product.hero_subtitle.op('<->')(search)
+        )
+    else:
+        query = query.order_by(Product.created_at.desc())
 
     total_items = query.count()
-    products = query.order_by(Product.created_at.desc()).offset(offset).limit(limit).all()
+    products = query.offset(offset).limit(limit).all()
     
     return products, total_items
 
