@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.db.session import get_db
-from app.services.product_service import get_product_by_slug, get_all_products, get_product_by_category
+from app.services.product_service import get_product_by_slug, get_product_list
 from app.schemas.v1.product_schema import ProductSchema, ProductListResponse
 from app.schemas.common import APIResponse
 
@@ -9,15 +10,19 @@ router = APIRouter()
 
 @router.get("/products", response_model=APIResponse[ProductListResponse])
 def list_products(
-    category: str = None, 
+    category: Optional[str] = None, 
+    search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    if category:
-        products, total_items = get_product_by_category(db, category, page, limit)
-    else:
-        products, total_items = get_all_products(db, page, limit)
+    products, total_items = get_product_list(
+        db=db, 
+        page=page, 
+        limit=limit, 
+        category=category, 
+        search=search
+    )
     
     total_pages = (total_items + limit - 1) // limit
 
