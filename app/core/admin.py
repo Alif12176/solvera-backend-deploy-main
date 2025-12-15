@@ -9,25 +9,14 @@ from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ
 from app.models.blog import Article, Author, Category
 
-# ==========================================
-# HELPERS
-# ==========================================
-
 def format_relation_link(model, attribute):
-    """
-    Renders a clickable link for related items (Parent Product/Solution).
-    """
     related_obj = getattr(model, attribute)
     if not related_obj:
         return ""
     name = str(related_obj)
-    # The search param must match the parent's string representation
     return Markup(f'<a href="?search={name}" style="text-decoration: underline; color: #3b82f6;">{name}</a>')
 
 class LineSeparatedListField(TextAreaField):
-    """
-    Custom field: User types lines, DB saves JSON list.
-    """
     def _value(self):
         if self.data and isinstance(self.data, list):
             return "\n".join(self.data)
@@ -38,10 +27,6 @@ class LineSeparatedListField(TextAreaField):
             self.data = [x.strip() for x in valuelist[0].split('\n') if x.strip()]
         else:
             self.data = []
-
-# ==========================================
-# AUTHENTICATION
-# ==========================================
 
 class AdminAuth(AuthenticationBackend):
     async def login(self, request: Request) -> bool:
@@ -60,10 +45,6 @@ class AdminAuth(AuthenticationBackend):
         return bool(request.session.get("token"))
 
 authentication_backend = AdminAuth(secret_key=settings.SECRET_KEY)
-
-# ==========================================
-# 1. BLOG MANAGEMENT
-# ==========================================
 
 class ArticleAdmin(ModelView, model=Article):
     category = "Blog Manager"
@@ -110,10 +91,6 @@ class CategoryAdmin(ModelView, model=Category):
     column_searchable_list = [Category.name]
     form_excluded_columns = [Category.created_at, Category.updated_at]
 
-# ==========================================
-# 2. PRODUCT MANAGEMENT
-# ==========================================
-
 class ProductAdmin(ModelView, model=Product):
     category = "Product Manager"
     name = "Product Page"
@@ -134,8 +111,7 @@ class ProductFeatureAdmin(ModelView, model=ProductFeature):
 
     column_list = [ProductFeature.product, ProductFeature.tab_label, ProductFeature.sequence]
     column_sortable_list = [ProductFeature.product_id, ProductFeature.sequence]
-    
-    # FIX: Use "product.name" string instead of Product.name object
+
     column_searchable_list = ["product.name", ProductFeature.tab_label, ProductFeature.content_title, ProductFeature.content_description]
     
     column_formatters = { ProductFeature.product: format_relation_link }
@@ -156,8 +132,6 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
     icon = "fa-solid fa-thumbs-up"
 
     column_list = [ProductWhyUs.product, ProductWhyUs.card_label, ProductWhyUs.sequence]
-    
-    # FIX: Use "product.name"
     column_searchable_list = ["product.name", ProductWhyUs.card_label, ProductWhyUs.section_title]
     
     column_formatters = { ProductWhyUs.product: format_relation_link }
@@ -172,8 +146,6 @@ class ProductFAQAdmin(ModelView, model=ProductFAQ):
     icon = "fa-solid fa-circle-question"
 
     column_list = [ProductFAQ.product, ProductFAQ.question, ProductFAQ.sequence]
-    
-    # FIX: Use "product.name"
     column_searchable_list = ["product.name", ProductFAQ.question, ProductFAQ.answer]
     
     column_formatters = { ProductFAQ.product: format_relation_link }
@@ -182,10 +154,6 @@ class ProductFAQAdmin(ModelView, model=ProductFAQ):
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
-
-# ==========================================
-# 3. SOLUTION MANAGEMENT
-# ==========================================
 
 class SolutionAdmin(ModelView, model=Solution):
     category = "Solution Manager"
@@ -207,7 +175,6 @@ class SolutionFeatureAdmin(ModelView, model=SolutionFeature):
 
     column_list = [SolutionFeature.solution, SolutionFeature.tab_label, SolutionFeature.sequence]
     
-    # FIX: Use "solution.name"
     column_searchable_list = ["solution.name", SolutionFeature.tab_label, SolutionFeature.content_title]
     
     column_formatters = { SolutionFeature.solution: format_relation_link }
@@ -228,7 +195,6 @@ class SolutionWhyUsAdmin(ModelView, model=SolutionWhyUs):
 
     column_list = [SolutionWhyUs.solution, SolutionWhyUs.title, SolutionWhyUs.sequence]
     
-    # FIX: Use "solution.name"
     column_searchable_list = ["solution.name", SolutionWhyUs.title, SolutionWhyUs.description]
     
     column_formatters = { SolutionWhyUs.solution: format_relation_link }
@@ -246,7 +212,6 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
 
     column_list = [SolutionRelatedProduct.solution, SolutionRelatedProduct.product, SolutionRelatedProduct.sequence]
     
-    # FIX: Use "solution.name" and "product.name"
     column_searchable_list = ["solution.name", "product.name"]
     
     column_formatters = { 
@@ -268,7 +233,6 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
 
     column_list = [SolutionFAQ.solution, SolutionFAQ.question, SolutionFAQ.sequence]
     
-    # FIX: Use "solution.name"
     column_searchable_list = ["solution.name", SolutionFAQ.question, SolutionFAQ.answer]
     
     column_formatters = { SolutionFAQ.solution: format_relation_link }
@@ -277,10 +241,6 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     form_ajax_refs = { "solution": { "fields": ["name"], "order_by": "name", "placeholder": "Select Solution..." } }
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
-
-# ==========================================
-# SETUP FUNCTION
-# ==========================================
 
 def setup_admin(app, engine):
     admin = Admin(
