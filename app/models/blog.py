@@ -11,10 +11,9 @@ article_categories = Table(
     Column('category_id', Integer, ForeignKey('categories.id'), primary_key=True)
 )
 
-# 1. Tabel Authors
 class Author(Base):
     __tablename__ = "authors"
-
+    name = Column(String, nullable=False)
     id = Column(Integer, primary_key=True, index=True) 
     name = Column(String, nullable=False)
     
@@ -23,10 +22,12 @@ class Author(Base):
 
     articles = relationship("Article", back_populates="publisher")
 
-# 2. Tabel Categories
+    def __str__(self):
+        return self.name
+
 class Category(Base):
     __tablename__ = "categories"
-
+    name = Column(String, nullable=False, unique=True)
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
     
@@ -35,10 +36,12 @@ class Category(Base):
 
     articles = relationship("Article", secondary=article_categories, back_populates="categories")
 
-# 3. Tabel Articles
+    def __str__(self):
+        return self.name
+
 class Article(Base):
     __tablename__ = "articles"
-
+    title = Column(String, nullable=False)
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
     publisher_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
@@ -55,3 +58,6 @@ class Article(Base):
 
     publisher = relationship("Author", back_populates="articles")
     categories = relationship("Category", secondary=article_categories, back_populates="articles")
+    
+    def __str__(self):
+        return self.title

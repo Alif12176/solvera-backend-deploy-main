@@ -1,11 +1,12 @@
 from uuid import uuid4
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer, JSON
+from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 class Solution(Base):
     __tablename__ = "solutions"
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
     slug = Column(String, unique=True, index=True) 
@@ -23,6 +24,9 @@ class Solution(Base):
     faqs = relationship("SolutionFAQ", back_populates="solution", order_by="SolutionFAQ.sequence", cascade="all, delete-orphan")
     related_products = relationship("SolutionRelatedProduct", back_populates="solution", order_by="SolutionRelatedProduct.sequence", cascade="all, delete-orphan")
 
+    def __str__(self):
+        return self.name
+
 class SolutionFeature(Base):
     __tablename__ = "solution_features"
 
@@ -33,6 +37,7 @@ class SolutionFeature(Base):
     content_title = Column(String, nullable=True) 
     content_description = Column(Text, nullable=True)
     
+    # Changed back to JSON. Stores as ['Benefit 1', 'Benefit 2']
     benefits = Column(JSON, nullable=True) 
     
     sequence = Column(Integer, default=0, index=True)
@@ -40,6 +45,9 @@ class SolutionFeature(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     solution = relationship("Solution", back_populates="features")
+
+    def __str__(self):
+        return self.tab_label or self.content_title or "Solution Feature"
 
 class SolutionWhyUs(Base):
     __tablename__ = "solution_why_us"
@@ -59,6 +67,9 @@ class SolutionWhyUs(Base):
 
     solution = relationship("Solution", back_populates="why_us")
 
+    def __str__(self):
+        return self.title or "Why Us Item"
+
 class SolutionRelatedProduct(Base):
     __tablename__ = "solution_related_products"
 
@@ -74,6 +85,9 @@ class SolutionRelatedProduct(Base):
     solution = relationship("Solution", back_populates="related_products")
     product = relationship("app.models.product.Product")
 
+    def __str__(self):
+        return f"Related: {self.product.name if self.product else 'Unknown'}"
+
 class SolutionFAQ(Base):
     __tablename__ = "solution_faqs"
 
@@ -88,3 +102,6 @@ class SolutionFAQ(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     solution = relationship("Solution", back_populates="faqs")
+
+    def __str__(self):
+        return self.question

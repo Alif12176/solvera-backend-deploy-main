@@ -3,9 +3,19 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqladmin import Admin
+
 from app.routers.v1 import product as product_v1
 from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
+from app.db.session import engine
+from app.core.config import settings
+from app.core.admin import (
+    authentication_backend,
+    ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin,
+    SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin,
+    ArticleAdmin, AuthorAdmin, CategoryAdmin
+)
 
 tags_metadata = [
     {
@@ -27,7 +37,7 @@ tags_metadata = [
 ]
 
 app = FastAPI(
-    title="Solvera Corporate Website API",
+    title=settings.PROJECT_NAME,
     description="Backend API for Solvera Corporate Website",
     version="1.0.0",
     openapi_tags=tags_metadata
@@ -46,9 +56,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(product_v1.router, prefix="/api/v1", tags=["Products"])
-app.include_router(blog_v1.router, prefix="/api/v1", tags=["Blogs"])
-app.include_router(solution_v1.router, prefix="/api/v1/solutions", tags=["Solutions"])
+app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
+app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"])
+app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"])
+
+admin = Admin(app, engine, authentication_backend=authentication_backend)
+admin.add_view(ProductAdmin)
+admin.add_view(ProductFeatureAdmin)
+admin.add_view(ProductWhyUsAdmin)
+admin.add_view(ProductFAQAdmin)
+admin.add_view(SolutionAdmin)
+admin.add_view(SolutionFeatureAdmin)
+admin.add_view(SolutionWhyUsAdmin)
+admin.add_view(SolutionFAQAdmin)
+admin.add_view(SolutionRelatedProductAdmin)
+admin.add_view(ArticleAdmin)
+admin.add_view(AuthorAdmin)
+admin.add_view(CategoryAdmin)
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

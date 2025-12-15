@@ -4,7 +4,6 @@ from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
-# 1. Tabel Products
 class Product(Base):
     __tablename__ = "products"
 
@@ -24,7 +23,9 @@ class Product(Base):
     why_us = relationship("ProductWhyUs", back_populates="product", order_by="ProductWhyUs.sequence", cascade="all, delete-orphan")
     faqs = relationship("ProductFAQ", back_populates="product", order_by="ProductFAQ.sequence", cascade="all, delete-orphan")
 
-# 2. Tabel Features 
+    def __str__(self):
+        return self.name
+
 class ProductFeature(Base):
     __tablename__ = "product_features"
 
@@ -37,7 +38,7 @@ class ProductFeature(Base):
     content_title = Column(Text, nullable=False)    
     content_description = Column(Text, nullable=True)
     
-
+    # Changed back to JSON. Stores as ['Benefit 1', 'Benefit 2']
     benefits = Column(JSON, nullable=True)        
     
     sequence = Column(Integer, default=0, index=True)
@@ -47,14 +48,15 @@ class ProductFeature(Base):
 
     product = relationship("Product", back_populates="features")
 
-# 3. Tabel Why Us
+    def __str__(self):
+        return f"{self.tab_label} ({self.product.name if self.product else 'No Product'})"
+
 class ProductWhyUs(Base):
     __tablename__ = "product_why_us"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"))
     
-    # Kolom Baru
     section_title = Column(Text, nullable=True)
     section_subtitle = Column(Text, nullable=True)
     card_label = Column(Text, nullable=True) 
@@ -68,7 +70,9 @@ class ProductWhyUs(Base):
 
     product = relationship("Product", back_populates="why_us")
 
-# 4. Tabel FAQ
+    def __str__(self):
+        return self.card_label or self.section_title or "Why Us Item"
+
 class ProductFAQ(Base):
     __tablename__ = "product_faqs"
 
@@ -78,9 +82,12 @@ class ProductFAQ(Base):
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
 
-    sequence = Column(Integer, default=0, index=True) # 'order'
+    sequence = Column(Integer, default=0, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     product = relationship("Product", back_populates="faqs")
+
+    def __str__(self):
+        return self.question
