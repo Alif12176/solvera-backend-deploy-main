@@ -37,7 +37,6 @@ class SolutionFeature(Base):
     content_title = Column(String, nullable=True) 
     content_description = Column(Text, nullable=True)
     
-    # Changed back to JSON. Stores as ['Benefit 1', 'Benefit 2']
     benefits = Column(JSON, nullable=True) 
     
     sequence = Column(Integer, default=0, index=True)
@@ -86,7 +85,7 @@ class SolutionRelatedProduct(Base):
     product = relationship("app.models.product.Product")
 
     def __str__(self):
-        return f"Related: {self.product.name if self.product else 'Unknown'}"
+        return f"Related Product Seq: {self.sequence}"
 
 class SolutionFAQ(Base):
     __tablename__ = "solution_faqs"

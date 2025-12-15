@@ -38,7 +38,6 @@ class ProductFeature(Base):
     content_title = Column(Text, nullable=False)    
     content_description = Column(Text, nullable=True)
     
-    # Changed back to JSON. Stores as ['Benefit 1', 'Benefit 2']
     benefits = Column(JSON, nullable=True)        
     
     sequence = Column(Integer, default=0, index=True)
@@ -49,7 +48,7 @@ class ProductFeature(Base):
     product = relationship("Product", back_populates="features")
 
     def __str__(self):
-        return f"{self.tab_label} ({self.product.name if self.product else 'No Product'})"
+        return self.tab_label or "Product Feature"
 
 class ProductWhyUs(Base):
     __tablename__ = "product_why_us"

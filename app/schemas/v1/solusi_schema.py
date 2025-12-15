@@ -42,7 +42,7 @@ class CoreSolutionItem(ORMBase):
     id: Optional[UUID] = None
     icon: Optional[str] = None
     title: str
-    description: str
+    description: Optional[str] = None 
     sequence: Optional[int] = None
 
 class CoreSolution(ORMBase):
