@@ -119,11 +119,8 @@ class ArticleAdmin(ModelView, model=Article):
         "categories": { "fields": ["name"], "order_by": "name", "placeholder": "Add Categories..." }
     }
     
-    # 1. OVERRIDES: Text Areas for content
     form_overrides = dict(content=TextAreaField, summary=TextAreaField)
     
-    # 2. EXTRA FIELDS: This forces 'slug' and 'published_at' to be Optional in the UI,
-    #    ignoring the Database 'nullable=False' constraint.
     form_extra_fields = {
         "slug": StringField("URL Slug (Auto-generated if empty)", validators=[Optional()]),
         "published_at": DateTimeField("Published Date (Leave empty for Now)", validators=[Optional()], format="%Y-%m-%d %H:%M:%S")
@@ -149,18 +146,15 @@ class ArticleAdmin(ModelView, model=Article):
         return query
 
     async def on_model_change(self, data, model, is_created, request):
-        # LOGIC: If slug is empty, generate from Title
         if not data.get("slug") and data.get("title"):
             slug = data["title"].lower().strip()
             slug = re.sub(r'[^\w\s-]', '', slug)
             slug = re.sub(r'[\s_-]+', '-', slug)
             data["slug"] = slug
 
-        # LOGIC: If published_at is empty, use Current Time
         if not data.get("published_at"):
             data["published_at"] = datetime.now()
 
-        # LOGIC: Auto-assign Publisher for non-admins
         role = request.session.get("role")
         user_id = request.session.get("user_id")
 
