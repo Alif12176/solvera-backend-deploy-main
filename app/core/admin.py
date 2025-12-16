@@ -2,7 +2,7 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField
-from wtforms.validators import Optional
+from wtforms.validators import Optional, DataRequired
 from markupsafe import Markup
 import re
 from datetime import datetime
@@ -74,8 +74,8 @@ class UserAdmin(ModelView, model=User):
     icon = "fa-solid fa-users"
 
     column_list = [User.username, User.role, User.is_active]
-    
     form_excluded_columns = [User.id, User.author_profile]
+
     form_overrides = {
         "password_hash": PasswordField
     }
@@ -102,8 +102,16 @@ class UserAdmin(ModelView, model=User):
         return request.session.get("role") == "admin"
 
     async def on_model_change(self, data, model, is_created, request):
+        if is_created:
+            db = SessionLocal()
+            try:
+                existing = db.query(User).filter(User.username == data.get("username")).first()
+                if existing:
+                    raise ValueError(f"Username '{data.get('username')}' is already taken.")
+            finally:
+                db.close()
+
         incoming_password = data.get("password_hash")
-        
         if incoming_password:
             data["password_hash"] = get_password_hash(incoming_password)
         elif is_created:
@@ -161,6 +169,18 @@ class ArticleAdmin(ModelView, model=Article):
             slug = re.sub(r'[\s_-]+', '-', slug)
             data["slug"] = slug
 
+        if data.get("slug"):
+            db = SessionLocal()
+            try:
+                query = db.query(Article).filter(Article.slug == data["slug"])
+                if not is_created:
+                    query = query.filter(Article.id != model.id)
+                
+                if query.first():
+                    raise ValueError(f"The URL Slug '{data['slug']}' is already in use by another article.")
+            finally:
+                db.close()
+
         if not data.get("published_at"):
             data["published_at"] = datetime.now()
 
@@ -211,6 +231,19 @@ class ProductAdmin(ModelView, model=Product):
     form_overrides = dict(hero_subtitle=TextAreaField)
     form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
     column_labels = { Product.hero_title: "Hero Banner Title", Product.hero_subtitle: "Hero Banner Text" }
+
+    async def on_model_change(self, data, model, is_created, request):
+        if data.get("slug"):
+            db = SessionLocal()
+            try:
+                query = db.query(Product).filter(Product.slug == data["slug"])
+                if not is_created:
+                    query = query.filter(Product.id != model.id)
+                
+                if query.first():
+                    raise ValueError(f"Product Slug '{data['slug']}' already exists.")
+            finally:
+                db.close()
 
 class ProductFeatureAdmin(ModelView, model=ProductFeature):
     category = "Product Manager"
@@ -276,6 +309,19 @@ class SolutionAdmin(ModelView, model=Solution):
     form_overrides = dict(hero_subtitle=TextAreaField)
     form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
     column_labels = { Solution.hero_title: "Hero Banner Title", Solution.hero_subtitle: "Hero Banner Text" }
+
+    async def on_model_change(self, data, model, is_created, request):
+        if data.get("slug"):
+            db = SessionLocal()
+            try:
+                query = db.query(Solution).filter(Solution.slug == data["slug"])
+                if not is_created:
+                    query = query.filter(Solution.id != model.id)
+                
+                if query.first():
+                    raise ValueError(f"Solution Slug '{data['slug']}' already exists.")
+            finally:
+                db.close()
 
 class SolutionFeatureAdmin(ModelView, model=SolutionFeature):
     category = "Solution Manager"
