@@ -2,7 +2,7 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField
-from wtforms.validators import Optional, DataRequired
+from wtforms.validators import Optional, DataRequired, ValidationError
 from markupsafe import Markup
 import re
 from datetime import datetime
@@ -107,7 +107,7 @@ class UserAdmin(ModelView, model=User):
             try:
                 existing = db.query(User).filter(User.username == data.get("username")).first()
                 if existing:
-                    raise ValueError(f"Username '{data.get('username')}' is already taken.")
+                    raise ValidationError(f"Username '{data.get('username')}' is already taken.")
             finally:
                 db.close()
 
@@ -115,7 +115,7 @@ class UserAdmin(ModelView, model=User):
         if incoming_password:
             data["password_hash"] = get_password_hash(incoming_password)
         elif is_created:
-             raise Exception("Password is required for new users.")
+             raise ValidationError("Password is required for new users.")
         else:
             if "password_hash" in data:
                 del data["password_hash"]
@@ -177,7 +177,7 @@ class ArticleAdmin(ModelView, model=Article):
                     query = query.filter(Article.id != model.id)
                 
                 if query.first():
-                    raise ValueError(f"The URL Slug '{data['slug']}' is already in use by another article.")
+                    raise ValidationError(f"The URL Slug '{data['slug']}' is already in use by another article.")
             finally:
                 db.close()
 
@@ -194,7 +194,7 @@ class ArticleAdmin(ModelView, model=Article):
                 if author:
                     data["publisher_id"] = author.id
                 else:
-                    raise Exception("You must have an Author Profile linked to your User to post.")
+                    raise ValidationError("You must have an Author Profile linked to your User to post.")
             finally:
                 db.close()
 
@@ -241,7 +241,7 @@ class ProductAdmin(ModelView, model=Product):
                     query = query.filter(Product.id != model.id)
                 
                 if query.first():
-                    raise ValueError(f"Product Slug '{data['slug']}' already exists.")
+                    raise ValidationError(f"Product Slug '{data['slug']}' already exists.")
             finally:
                 db.close()
 
@@ -319,7 +319,7 @@ class SolutionAdmin(ModelView, model=Solution):
                     query = query.filter(Solution.id != model.id)
                 
                 if query.first():
-                    raise ValueError(f"Solution Slug '{data['slug']}' already exists.")
+                    raise ValidationError(f"Solution Slug '{data['slug']}' already exists.")
             finally:
                 db.close()
 

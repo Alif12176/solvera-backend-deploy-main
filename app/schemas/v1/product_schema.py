@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from uuid import UUID
@@ -14,6 +14,7 @@ class FeatureTabItem(ORMBase):
     tab_label: str
     content_title: str
     content_description: Optional[str] = None 
+    image_url: Optional[str] = None
     benefits: Optional[List[str]] = [] 
     sequence: int 
 
@@ -39,6 +40,11 @@ class ProductSchema(ORMBase):
     
     hero_title: str
     hero_subtitle: Optional[str] = None
+    hero_image: Optional[str] = None
+    
+    cta_primary_text: Optional[str] = None
+    cta_secondary_text: Optional[str] = None
+    cta_image: Optional[str] = None
     
     features: List[FeatureTabItem] = [] 
     why_us: List[WhyUsCardItem] = []

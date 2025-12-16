@@ -10,10 +10,15 @@ class Product(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     slug = Column(String, unique=True, index=True) 
     name = Column(Text, nullable=False)
-    
     hero_title = Column(Text, nullable=False)
     hero_subtitle = Column(Text, nullable=True)
     
+    hero_image = Column(String, nullable=True) 
+
+    cta_primary_text = Column(String, nullable=True)
+    cta_secondary_text = Column(String, nullable=True)
+    cta_image = Column(String, nullable=True)
+
     category = Column(String, index=True, nullable=True) 
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -38,6 +43,8 @@ class ProductFeature(Base):
     content_title = Column(Text, nullable=False)    
     content_description = Column(Text, nullable=True)
     
+    image_url = Column(String, nullable=True)
+
     benefits = Column(JSON, nullable=True)        
     
     sequence = Column(Integer, default=0, index=True)
