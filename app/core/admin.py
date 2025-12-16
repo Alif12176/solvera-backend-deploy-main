@@ -74,10 +74,20 @@ class UserAdmin(ModelView, model=User):
     icon = "fa-solid fa-users"
 
     column_list = [User.username, User.role, User.is_active]
-    form_excluded_columns = [User.password_hash]
+    
+    form_excluded_columns = [User.id, User.author_profile]
+    form_overrides = {
+        "password_hash": PasswordField
+    }
+    
+    form_args = {
+        "password_hash": {
+            "label": "Password",
+            "description": "Leave empty to keep current password (if editing)."
+        }
+    }
 
     form_extra_fields = {
-        "password": PasswordField("New Password"),
         "role": SelectField(
             "Role",
             choices=[("admin", "Admin"), ("editor", "Editor")],
@@ -92,16 +102,15 @@ class UserAdmin(ModelView, model=User):
         return request.session.get("role") == "admin"
 
     async def on_model_change(self, data, model, is_created, request):
-        plain_password = data.get("password")
+        incoming_password = data.get("password_hash")
         
-        if plain_password:
-            data["password_hash"] = get_password_hash(plain_password)
-            del data["password"]
+        if incoming_password:
+            data["password_hash"] = get_password_hash(incoming_password)
         elif is_created:
              raise Exception("Password is required for new users.")
         else:
-            if "password" in data:
-                del data["password"]
+            if "password_hash" in data:
+                del data["password_hash"]
 
 class ArticleAdmin(ModelView, model=Article):
     category = "Blog Manager"
