@@ -1,8 +1,22 @@
 from uuid import uuid4
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer, Table
+from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer, Table, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, default="editor") 
+    is_active = Column(Boolean, default=True)
+    
+    author_profile = relationship("Author", back_populates="user", uselist=False)
+
+    def __str__(self):
+        return f"{self.username} ({self.role})"
 
 article_categories = Table(
     'article_categories',
@@ -13,21 +27,22 @@ article_categories = Table(
 
 class Author(Base):
     __tablename__ = "authors"
-    name = Column(String, nullable=False)
+    
     id = Column(Integer, primary_key=True, index=True) 
     name = Column(String, nullable=False)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, unique=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     articles = relationship("Article", back_populates="publisher")
+    user = relationship("User", back_populates="author_profile")
 
     def __str__(self):
         return self.name
 
 class Category(Base):
     __tablename__ = "categories"
-    name = Column(String, nullable=False, unique=True)
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, unique=True)
     
@@ -41,7 +56,6 @@ class Category(Base):
 
 class Article(Base):
     __tablename__ = "articles"
-    title = Column(String, nullable=False)
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
     publisher_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
@@ -51,7 +65,6 @@ class Article(Base):
     content = Column(Text, nullable=False)
     image_url = Column(String, nullable=True) 
     
-    # Metadata
     published_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,13 +1,19 @@
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
-from wtforms import TextAreaField
+from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField
+from wtforms.validators import Optional
 from markupsafe import Markup
+import re
+from datetime import datetime
 
 from app.core.config import settings 
+from app.core.security import verify_password, get_password_hash
+from app.db.session import SessionLocal
+
 from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ
-from app.models.blog import Article, Author, Category
+from app.models.blog import Article, Author, Category, User
 
 def format_relation_link(model, attribute):
     related_obj = getattr(model, attribute)
@@ -31,10 +37,25 @@ class LineSeparatedListField(TextAreaField):
 class AdminAuth(AuthenticationBackend):
     async def login(self, request: Request) -> bool:
         form = await request.form()
-        username, password = form.get("username"), form.get("password")
-        if username == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD:
-            request.session.update({"token": "admin_token"})
-            return True
+        username = form.get("username")
+        password = form.get("password")
+
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.username == username).first()
+            if user and verify_password(password, user.password_hash):
+                if not user.is_active:
+                    return False
+                request.session.update({
+                    "token": "authenticated",
+                    "user_id": str(user.id),
+                    "role": user.role,
+                    "username": user.username
+                })
+                return True
+        finally:
+            db.close()
+            
         return False
 
     async def logout(self, request: Request) -> bool:
@@ -45,6 +66,42 @@ class AdminAuth(AuthenticationBackend):
         return bool(request.session.get("token"))
 
 authentication_backend = AdminAuth(secret_key=settings.SECRET_KEY)
+
+class UserAdmin(ModelView, model=User):
+    category = "System"
+    name = "User"
+    name_plural = "Users"
+    icon = "fa-solid fa-users"
+
+    column_list = [User.username, User.role, User.is_active]
+    form_excluded_columns = [User.password_hash]
+
+    form_extra_fields = {
+        "password": PasswordField("New Password"),
+        "role": SelectField(
+            "Role",
+            choices=[("admin", "Admin"), ("editor", "Editor")],
+            default="editor"
+        )
+    }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    async def on_model_change(self, data, model, is_created, request):
+        plain_password = data.get("password")
+        
+        if plain_password:
+            data["password_hash"] = get_password_hash(plain_password)
+            del data["password"]
+        elif is_created:
+             raise Exception("Password is required for new users.")
+        else:
+            if "password" in data:
+                del data["password"]
 
 class ArticleAdmin(ModelView, model=Article):
     category = "Blog Manager"
@@ -62,25 +119,74 @@ class ArticleAdmin(ModelView, model=Article):
         "categories": { "fields": ["name"], "order_by": "name", "placeholder": "Add Categories..." }
     }
     
+    # 1. OVERRIDES: Text Areas for content
     form_overrides = dict(content=TextAreaField, summary=TextAreaField)
+    
+    # 2. EXTRA FIELDS: This forces 'slug' and 'published_at' to be Optional in the UI,
+    #    ignoring the Database 'nullable=False' constraint.
+    form_extra_fields = {
+        "slug": StringField("URL Slug (Auto-generated if empty)", validators=[Optional()]),
+        "published_at": DateTimeField("Published Date (Leave empty for Now)", validators=[Optional()], format="%Y-%m-%d %H:%M:%S")
+    }
+
     form_args = {
         "content": dict(label="Main Content", render_kw={"rows": 20, "style": "width: 100%; font-family: monospace;"}), 
         "summary": dict(label="Short Summary", render_kw={"rows": 4, "style": "width: 100%;"})
     }
     
     column_labels = {
-        Article.image_url: "Cover Image URL",
-        Article.slug: "URL Slug (auto-generated if empty)"
+        Article.image_url: "Cover Image URL"
     }
+
+    def get_query(self, request: Request):
+        query = super().get_query(request)
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+
+        if role != "admin" and user_id:
+            query = query.join(Article.publisher).join(Author.user).filter(User.id == user_id)
+        
+        return query
+
+    async def on_model_change(self, data, model, is_created, request):
+        # LOGIC: If slug is empty, generate from Title
+        if not data.get("slug") and data.get("title"):
+            slug = data["title"].lower().strip()
+            slug = re.sub(r'[^\w\s-]', '', slug)
+            slug = re.sub(r'[\s_-]+', '-', slug)
+            data["slug"] = slug
+
+        # LOGIC: If published_at is empty, use Current Time
+        if not data.get("published_at"):
+            data["published_at"] = datetime.now()
+
+        # LOGIC: Auto-assign Publisher for non-admins
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+
+        if role != "admin" and is_created:
+            db = SessionLocal()
+            try:
+                author = db.query(Author).filter(Author.user_id == user_id).first()
+                if author:
+                    data["publisher_id"] = author.id
+                else:
+                    raise Exception("You must have an Author Profile linked to your User to post.")
+            finally:
+                db.close()
 
 class AuthorAdmin(ModelView, model=Author):
     category = "Blog Manager"
     name = "Author"
     name_plural = "Authors"
     icon = "fa-solid fa-user-pen"
-    column_list = [Author.name, Author.id]
+    column_list = [Author.name, Author.user]
     column_searchable_list = [Author.name]
     form_excluded_columns = [Author.created_at, Author.updated_at]
+    
+    form_ajax_refs = {
+        "user": { "fields": ["username"], "order_by": "username", "placeholder": "Link to Login User..." }
+    }
 
 class CategoryAdmin(ModelView, model=Category):
     category = "Blog Manager"
@@ -111,9 +217,7 @@ class ProductFeatureAdmin(ModelView, model=ProductFeature):
 
     column_list = [ProductFeature.product, ProductFeature.tab_label, ProductFeature.sequence]
     column_sortable_list = [ProductFeature.product_id, ProductFeature.sequence]
-
     column_searchable_list = ["product.name", ProductFeature.tab_label, ProductFeature.content_title, ProductFeature.content_description]
-    
     column_formatters = { ProductFeature.product: format_relation_link }
 
     form_excluded_columns = [ProductFeature.id, ProductFeature.created_at, ProductFeature.updated_at]
@@ -133,7 +237,6 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
 
     column_list = [ProductWhyUs.product, ProductWhyUs.card_label, ProductWhyUs.sequence]
     column_searchable_list = ["product.name", ProductWhyUs.card_label, ProductWhyUs.section_title]
-    
     column_formatters = { ProductWhyUs.product: format_relation_link }
 
     form_excluded_columns = [ProductWhyUs.id, ProductWhyUs.created_at, ProductWhyUs.updated_at]
@@ -147,7 +250,6 @@ class ProductFAQAdmin(ModelView, model=ProductFAQ):
 
     column_list = [ProductFAQ.product, ProductFAQ.question, ProductFAQ.sequence]
     column_searchable_list = ["product.name", ProductFAQ.question, ProductFAQ.answer]
-    
     column_formatters = { ProductFAQ.product: format_relation_link }
     
     form_excluded_columns = [ProductFAQ.id, ProductFAQ.created_at, ProductFAQ.updated_at]
@@ -162,7 +264,12 @@ class SolutionAdmin(ModelView, model=Solution):
     icon = "fa-solid fa-puzzle-piece"
     column_list = [Solution.name, Solution.category, Solution.slug]
     column_searchable_list = [Solution.name, Solution.hero_title]
-    form_excluded_columns = [Solution.id, Solution.created_at, Solution.updated_at, Solution.features, Solution.why_us, Solution.faqs, Solution.related_products]
+    
+    form_excluded_columns = [
+        Solution.id, Solution.created_at, Solution.updated_at, 
+        Solution.features, Solution.why_us, Solution.faqs, Solution.related_products
+    ]
+    
     form_overrides = dict(hero_subtitle=TextAreaField)
     form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
     column_labels = { Solution.hero_title: "Hero Banner Title", Solution.hero_subtitle: "Hero Banner Text" }
@@ -174,9 +281,7 @@ class SolutionFeatureAdmin(ModelView, model=SolutionFeature):
     icon = "fa-solid fa-list-check"
 
     column_list = [SolutionFeature.solution, SolutionFeature.tab_label, SolutionFeature.sequence]
-    
     column_searchable_list = ["solution.name", SolutionFeature.tab_label, SolutionFeature.content_title]
-    
     column_formatters = { SolutionFeature.solution: format_relation_link }
 
     form_excluded_columns = [SolutionFeature.id, SolutionFeature.created_at, SolutionFeature.updated_at]
@@ -194,9 +299,7 @@ class SolutionWhyUsAdmin(ModelView, model=SolutionWhyUs):
     icon = "fa-solid fa-thumbs-up"
 
     column_list = [SolutionWhyUs.solution, SolutionWhyUs.title, SolutionWhyUs.sequence]
-    
     column_searchable_list = ["solution.name", SolutionWhyUs.title, SolutionWhyUs.description]
-    
     column_formatters = { SolutionWhyUs.solution: format_relation_link }
     
     form_excluded_columns = [SolutionWhyUs.id, SolutionWhyUs.created_at, SolutionWhyUs.updated_at]
@@ -211,9 +314,7 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
     icon = "fa-solid fa-link"
 
     column_list = [SolutionRelatedProduct.solution, SolutionRelatedProduct.product, SolutionRelatedProduct.sequence]
-    
     column_searchable_list = ["solution.name", "product.name"]
-    
     column_formatters = { 
         SolutionRelatedProduct.solution: format_relation_link,
         SolutionRelatedProduct.product: format_relation_link 
@@ -232,9 +333,7 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     icon = "fa-solid fa-circle-question"
 
     column_list = [SolutionFAQ.solution, SolutionFAQ.question, SolutionFAQ.sequence]
-    
     column_searchable_list = ["solution.name", SolutionFAQ.question, SolutionFAQ.answer]
-    
     column_formatters = { SolutionFAQ.solution: format_relation_link }
     
     form_excluded_columns = [SolutionFAQ.id, SolutionFAQ.created_at, SolutionFAQ.updated_at]
@@ -251,6 +350,7 @@ def setup_admin(app, engine):
         templates_dir="templates"
     )
 
+    admin.add_view(UserAdmin)
     admin.add_view(ArticleAdmin)
     admin.add_view(AuthorAdmin)
     admin.add_view(CategoryAdmin)

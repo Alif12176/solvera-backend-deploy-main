@@ -13,6 +13,7 @@ from app.db.session import engine
 from app.core.config import settings
 from app.core.admin import (
     authentication_backend,
+    UserAdmin,
     ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin,
     SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin,
     ArticleAdmin, AuthorAdmin, CategoryAdmin
@@ -64,6 +65,7 @@ app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"]
 app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"])
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
+admin.add_view(UserAdmin)
 admin.add_view(ProductAdmin)
 admin.add_view(ProductFeatureAdmin)
 admin.add_view(ProductWhyUsAdmin)
