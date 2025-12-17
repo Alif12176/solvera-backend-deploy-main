@@ -47,7 +47,11 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",
-    "http://localhost:3001"
+    "http://localhost:3001",
+     # 👇 Tambahkan domain Vercel Anda di sini:
+    "https://corporate-website-solvera-9wek.vercel.app",  # Domain Preview yang sedang error
+    "https://corporate-website-solvera.vercel.app"
+
 ]
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
@@ -58,6 +62,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # 👇 OPSI TAMBAHAN (untuk Vercel):
+    # regex agar semua link preview Vercel otomatis diizinkan tanpa perlu add manual satu-satu
+    allow_origin_regex="https://corporate-website-solvera.*\.vercel\.app"
+
 )
 
 app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
