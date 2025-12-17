@@ -3,12 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
-
-from uuid import uuid4
-from sqlalchemy.dialects.postgresql import UUID, JSON
-from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
-from sqlalchemy.orm import relationship
-from app.db.base import Base
+from app.models.social_trust import SocialTrust
 
 class Product(Base):
     __tablename__ = "products"
@@ -34,7 +29,7 @@ class Product(Base):
     features = relationship("ProductFeature", back_populates="product", order_by="ProductFeature.sequence", cascade="all, delete-orphan")
     why_us = relationship("ProductWhyUs", back_populates="product", order_by="ProductWhyUs.sequence", cascade="all, delete-orphan")
     faqs = relationship("ProductFAQ", back_populates="product", order_by="ProductFAQ.sequence", cascade="all, delete-orphan")
-    social_trusts = relationship("ProductSocialTrust", back_populates="product", order_by="ProductSocialTrust.sequence", cascade="all, delete-orphan")
+    trusted_by = relationship("ProductSocialTrustLink", back_populates="product", order_by="ProductSocialTrustLink.sequence", cascade="all, delete-orphan")
 
     def __str__(self):
         return self.name
@@ -44,6 +39,7 @@ class ProductFeature(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"))
+    
     section_title = Column(Text, nullable=True)     
     section_subtitle = Column(Text, nullable=True)  
     tab_label = Column(Text, nullable=True)        
@@ -104,21 +100,17 @@ class ProductFAQ(Base):
     def __str__(self):
         return self.question
 
-class ProductSocialTrust(Base):
-    __tablename__ = "product_social_trusts"
+class ProductSocialTrustLink(Base):
+    __tablename__ = "product_social_trust_links"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"))
-    name = Column(String, nullable=True) 
+    social_trust_id = Column(UUID(as_uuid=True), ForeignKey("social_trusts.id"))
     
-    logo_url = Column(String, nullable=False)     
+    sequence = Column(Integer, default=0, index=True)
 
-    sequence = Column(Integer, default=0, index=True) 
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-    product = relationship("Product", back_populates="social_trusts")
+    product = relationship("Product", back_populates="trusted_by")
+    partner = relationship("app.models.social_trust.SocialTrust") 
 
     def __str__(self):
-        return self.name or "Partner Logo"
+        return f"Link"

@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.admin import (
     authentication_backend,
     UserAdmin,
-    ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin, ProductSocialTrustAdmin,
+    ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin, ProductSocialTrustLinkAdmin, SocialTrustAdmin,
     SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin,
     ArticleAdmin, AuthorAdmin, CategoryAdmin
 )
@@ -77,13 +77,17 @@ admin.add_view(UserAdmin)
 admin.add_view(ProductAdmin)
 admin.add_view(ProductFeatureAdmin)
 admin.add_view(ProductWhyUsAdmin)
-admin.add_view(ProductSocialTrustAdmin)
 admin.add_view(ProductFAQAdmin)
+
+admin.add_view(SocialTrustAdmin)
+admin.add_view(ProductSocialTrustLinkAdmin)
+
 admin.add_view(SolutionAdmin)
 admin.add_view(SolutionFeatureAdmin)
 admin.add_view(SolutionWhyUsAdmin)
 admin.add_view(SolutionFAQAdmin)
 admin.add_view(SolutionRelatedProductAdmin)
+
 admin.add_view(ArticleAdmin)
 admin.add_view(AuthorAdmin)
 admin.add_view(CategoryAdmin)

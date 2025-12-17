@@ -12,9 +12,10 @@ from app.core.config import settings
 from app.core.security import verify_password, get_password_hash
 from app.db.session import SessionLocal
 
-from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ, ProductSocialTrust
+from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ, ProductSocialTrustLink
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ
 from app.models.blog import Article, Author, Category, User
+from app.models.social_trust import SocialTrust
 
 class QuillEditorWidget(TextArea):
     def __call__(self, field, **kwargs):
@@ -62,6 +63,13 @@ class QuillEditorWidget(TextArea):
         """
         
         return Markup(str(textarea_html) + quill_html)
+
+def format_image_preview(model, attribute):
+    url = getattr(model, attribute)
+    if not url:
+        return ""
+
+    return Markup(f'<img src="{url}" height="40" style="border-radius: 4px; border: 1px solid #eee; background: white;" />')
 
 class RichTextField(TextAreaField):
     widget = QuillEditorWidget()
@@ -284,7 +292,20 @@ class ProductAdmin(ModelView, model=Product):
     icon = "fa-solid fa-box-open"
     column_list = [Product.name, Product.slug, Product.category, Product.updated_at]
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
-    form_excluded_columns = [Product.id, Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.social_trusts]
+    form_excluded_columns = [
+    Product.id, 
+    Product.created_at, 
+    Product.updated_at, 
+    Product.features, 
+    Product.why_us, 
+    Product.faqs, 
+    Product.trusted_by  
+    ]
+
+    column_formatters = {
+        Product.hero_image: format_image_preview
+    }
+    
     form_overrides = dict(hero_subtitle=TextAreaField)
     form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
     column_labels = { Product.hero_title: "Hero Banner Title", Product.hero_subtitle: "Hero Banner Text" }
@@ -333,19 +354,6 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
     column_formatters = { ProductWhyUs.product: format_relation_link }
 
     form_excluded_columns = [ProductWhyUs.id, ProductWhyUs.created_at, ProductWhyUs.updated_at]
-    form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
-
-class ProductSocialTrustAdmin(ModelView, model=ProductSocialTrust):
-    category = "Product Manager"
-    name = "Social Trust"
-    name_plural = "Social Trust / Partners"
-    icon = "fa-solid fa-handshake"
-
-    column_list = [ProductSocialTrust.product, ProductSocialTrust.name, ProductSocialTrust.sequence]
-    column_searchable_list = ["product.name", ProductSocialTrust.name]
-    column_formatters = { ProductSocialTrust.product: format_relation_link }
-
-    form_excluded_columns = [ProductSocialTrust.id, ProductSocialTrust.created_at, ProductSocialTrust.updated_at]
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
 
 class ProductFAQAdmin(ModelView, model=ProductFAQ):
@@ -460,6 +468,38 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
 
+class SocialTrustAdmin(ModelView, model=SocialTrust):
+    category = "General Content"
+    name = "Social Trust / Partner"
+    name_plural = "Social Trusts"
+    icon = "fa-solid fa-handshake"
+
+    column_list = [SocialTrust.name, SocialTrust.logo_url, SocialTrust.sequence]
+    column_searchable_list = [SocialTrust.name]
+    column_sortable_list = [SocialTrust.sequence]
+    
+    column_formatters = {
+        SocialTrust.logo_url: format_image_preview
+    }
+    column_labels = {
+        SocialTrust.logo_url: "Logo Preview"
+    }
+
+    form_excluded_columns = [SocialTrust.id, SocialTrust.created_at, SocialTrust.updated_at]
+
+class ProductSocialTrustLinkAdmin(ModelView, model=ProductSocialTrustLink):
+    category = "Product Manager"
+    name = "Assign Partner"
+    name_plural = "Assign Partners to Products"
+    icon = "fa-solid fa-link"
+
+    column_list = [ProductSocialTrustLink.product, ProductSocialTrustLink.partner, ProductSocialTrustLink.sequence]
+    
+    form_ajax_refs = {
+        "product": { "fields": ["name"], "order_by": "name", "placeholder": "Select Product" },
+        "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner (Social Trust)" }
+    }
+
 def setup_admin(app, engine):
     admin = Admin(
         app, 
@@ -477,7 +517,6 @@ def setup_admin(app, engine):
     admin.add_view(ProductAdmin)
     admin.add_view(ProductFeatureAdmin)
     admin.add_view(ProductWhyUsAdmin)
-    admin.add_view(ProductSocialTrustAdmin)
     admin.add_view(ProductFAQAdmin)
 
     admin.add_view(SolutionAdmin)
@@ -485,5 +524,8 @@ def setup_admin(app, engine):
     admin.add_view(SolutionWhyUsAdmin)
     admin.add_view(SolutionRelatedProductAdmin)
     admin.add_view(SolutionFAQAdmin)
+
+    admin.add_view(SocialTrustAdmin)
+    admin.add_view(ProductSocialTrustLinkAdmin)
 
     return admin

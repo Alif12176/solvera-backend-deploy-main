@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session, joinedload
-from app.models.product import Product
+from app.models.product import Product, ProductSocialTrustLink
 from sqlalchemy import func
 
 def get_product_list(
@@ -42,8 +42,8 @@ def get_product_by_slug(db: Session, slug: str):
     product = db.query(Product).options(
         joinedload(Product.features),
         joinedload(Product.why_us),
-        joinedload(Product.social_trusts),
-        joinedload(Product.faqs)
+        joinedload(Product.faqs),
+        joinedload(Product.trusted_by).joinedload(ProductSocialTrustLink.partner)
     ).filter(Product.slug == slug).first()
 
     return product

@@ -10,7 +10,7 @@ class ORMBase(BaseModel):
 class TabFeatureItem(ORMBase):
     id: UUID
     type: Literal["tab_item"] = "tab_item"
-
+    
     tab_label: str
     
     title: str = Field(..., alias="content_title") 
@@ -21,8 +21,9 @@ class TabFeatureItem(ORMBase):
 class ImageFeatureItem(ORMBase):
     id: UUID
     type: Literal["image_card"] = "image_card"
-
+    
     image_url: str
+    
     title: str = Field(..., alias="content_title")
     description: Optional[str] = Field(None, alias="content_description")
     benefits: Optional[List[str]] = []
@@ -43,10 +44,10 @@ class FAQItem(ORMBase):
     sequence: Optional[int] = None
 
 class SocialTrustItem(ORMBase):
-    id: Optional[UUID] = None
-    name: Optional[str] = None
+    id: UUID
+    name: str
     logo_url: str
-    sequence: Optional[int] = 0
+    sequence: int
 
 class ProductSchema(ORMBase):
     id: UUID 
@@ -65,16 +66,18 @@ class ProductSchema(ORMBase):
     cta_image: Optional[str] = None
     
     features: Union[List[TabFeatureItem], List[ImageFeatureItem]] = []
-    social_trusts: List[SocialTrustItem] = []
+    
     why_us: List[WhyUsCardItem] = []
     faqs: List[FAQItem] = []
+    
+    trusted_by: List[SocialTrustItem] = [] 
     
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     @model_validator(mode='before')
     @classmethod
-    def transform_features_based_on_layout(cls, data: Any) -> Any:
+    def transform_data(cls, data: Any) -> Any:
         if isinstance(data, dict):
             return data
 
@@ -98,14 +101,27 @@ class ProductSchema(ORMBase):
                     **base_item,
                     "type": "tab_item",
                     "tab_label": f.tab_label or "Untitled Tab"
-
                 })
             
             elif layout == 'feature_list':
                 cleaned_features.append({
                     **base_item,
                     "type": "image_card",
-                    "image_url": f.image_url or "" 
+                    "image_url": f.image_url or ""
+                })
+
+        raw_links = getattr(data, 'trusted_by', [])
+        cleaned_trusts = []
+        
+        sorted_links = sorted(raw_links, key=lambda x: x.sequence or 0)
+
+        for link in sorted_links:
+            if link.partner:
+                cleaned_trusts.append({
+                    "id": link.partner.id,
+                    "name": link.partner.name,
+                    "logo_url": link.partner.logo_url,
+                    "sequence": link.sequence
                 })
 
         product_dict = {
@@ -124,7 +140,8 @@ class ProductSchema(ORMBase):
             "updated_at": data.updated_at,
             "why_us": data.why_us, 
             "faqs": data.faqs,
-            "features": cleaned_features
+            "features": cleaned_features,
+            "trusted_by": cleaned_trusts
         }
         
         return product_dict
