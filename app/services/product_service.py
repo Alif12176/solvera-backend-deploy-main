@@ -42,6 +42,7 @@ def get_product_by_slug(db: Session, slug: str):
     product = db.query(Product).options(
         joinedload(Product.features),
         joinedload(Product.why_us),
+        joinedload(Product.social_trusts),
         joinedload(Product.faqs)
     ).filter(Product.slug == slug).first()
 

@@ -2,6 +2,7 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField
+from wtforms.widgets import TextArea
 from wtforms.validators import Optional, DataRequired, ValidationError
 from markupsafe import Markup
 import re
@@ -11,9 +12,59 @@ from app.core.config import settings
 from app.core.security import verify_password, get_password_hash
 from app.db.session import SessionLocal
 
-from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ
+from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ, ProductSocialTrust
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ
 from app.models.blog import Article, Author, Category, User
+
+class QuillEditorWidget(TextArea):
+    def __call__(self, field, **kwargs):
+        kwargs['style'] = 'display:none;'
+        if 'class_' not in kwargs:
+            kwargs['class_'] = ''
+        
+        textarea_html = super().__call__(field, **kwargs)
+        
+        editor_id = f"quill_editor_{field.id}"
+        
+        quill_html = f"""
+        <div style="background: white; margin-bottom: 20px;">
+            <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+            <div id="{editor_id}" style="height: 300px; color: black;">
+                {field.data or ''}
+            </div>
+        </div>
+        
+        <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+        <script>
+            (function() {{
+                var quill = new Quill('#{editor_id}', {{
+                    theme: 'snow',
+                    modules: {{
+                        toolbar: [
+                            [{{ 'header': [1, 2, 3, false] }}],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            ['blockquote', 'code-block'],
+                            [{{ 'list': 'ordered'}}, {{ 'list': 'bullet' }}],
+                            [{{ 'indent': '-1'}}, {{ 'indent': '+1' }}],
+                            ['link', 'image'],
+                            ['clean']
+                        ]
+                    }}
+                }});
+                
+                var textarea = document.getElementById('{field.id}');
+                
+                quill.on('text-change', function() {{
+                    textarea.value = quill.root.innerHTML;
+                }});
+            }})();
+        </script>
+        """
+        
+        return Markup(str(textarea_html) + quill_html)
+
+class RichTextField(TextAreaField):
+    widget = QuillEditorWidget()
 
 def format_relation_link(model, attribute):
     related_obj = getattr(model, attribute)
@@ -136,7 +187,8 @@ class ArticleAdmin(ModelView, model=Article):
         "categories": { "fields": ["name"], "order_by": "name", "placeholder": "Add Categories..." }
     }
     
-    form_overrides = dict(content=TextAreaField, summary=TextAreaField)
+    # ✅ UPDATE: Both content AND summary now use RichTextField
+    form_overrides = dict(content=RichTextField, summary=RichTextField)
     
     form_extra_fields = {
         "slug": StringField("URL Slug (Auto-generated if empty)", validators=[Optional()]),
@@ -144,8 +196,7 @@ class ArticleAdmin(ModelView, model=Article):
     }
 
     form_args = {
-        "content": dict(label="Main Content", render_kw={"rows": 20, "style": "width: 100%; font-family: monospace;"}), 
-        "summary": dict(label="Short Summary", render_kw={"rows": 4, "style": "width: 100%;"})
+        "summary": dict(label="Short Summary")
     }
     
     column_labels = {
@@ -172,12 +223,18 @@ class ArticleAdmin(ModelView, model=Article):
         if data.get("slug"):
             db = SessionLocal()
             try:
-                query = db.query(Article).filter(Article.slug == data["slug"])
-                if not is_created:
-                    query = query.filter(Article.id != model.id)
-                
-                if query.first():
-                    raise ValidationError(f"The URL Slug '{data['slug']}' is already in use by another article.")
+                original_slug = data["slug"]
+                counter = 1
+                while True:
+                    query = db.query(Article).filter(Article.slug == data["slug"])
+                    if not is_created:
+                        query = query.filter(Article.id != model.id)
+                    
+                    if not query.first():
+                        break 
+                    
+                    data["slug"] = f"{original_slug}-{counter}"
+                    counter += 1
             finally:
                 db.close()
 
@@ -227,7 +284,7 @@ class ProductAdmin(ModelView, model=Product):
     icon = "fa-solid fa-box-open"
     column_list = [Product.name, Product.slug, Product.category, Product.updated_at]
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
-    form_excluded_columns = [Product.id, Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs]
+    form_excluded_columns = [Product.id, Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.social_trusts]
     form_overrides = dict(hero_subtitle=TextAreaField)
     form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
     column_labels = { Product.hero_title: "Hero Banner Title", Product.hero_subtitle: "Hero Banner Text" }
@@ -276,6 +333,19 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
     column_formatters = { ProductWhyUs.product: format_relation_link }
 
     form_excluded_columns = [ProductWhyUs.id, ProductWhyUs.created_at, ProductWhyUs.updated_at]
+    form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
+
+class ProductSocialTrustAdmin(ModelView, model=ProductSocialTrust):
+    category = "Product Manager"
+    name = "Social Trust"
+    name_plural = "Social Trust / Partners"
+    icon = "fa-solid fa-handshake"
+
+    column_list = [ProductSocialTrust.product, ProductSocialTrust.name, ProductSocialTrust.sequence]
+    column_searchable_list = ["product.name", ProductSocialTrust.name]
+    column_formatters = { ProductSocialTrust.product: format_relation_link }
+
+    form_excluded_columns = [ProductSocialTrust.id, ProductSocialTrust.created_at, ProductSocialTrust.updated_at]
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
 
 class ProductFAQAdmin(ModelView, model=ProductFAQ):
@@ -407,6 +477,7 @@ def setup_admin(app, engine):
     admin.add_view(ProductAdmin)
     admin.add_view(ProductFeatureAdmin)
     admin.add_view(ProductWhyUsAdmin)
+    admin.add_view(ProductSocialTrustAdmin)
     admin.add_view(ProductFAQAdmin)
 
     admin.add_view(SolutionAdmin)
