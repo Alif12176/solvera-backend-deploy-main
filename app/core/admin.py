@@ -1,11 +1,13 @@
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
-from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField
+from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField, HiddenField
 from wtforms.widgets import TextArea
 from wtforms.validators import Optional, DataRequired, ValidationError
 from markupsafe import Markup
 import re
+import uuid
+import html
 from datetime import datetime
 
 from app.core.config import settings 
@@ -13,7 +15,7 @@ from app.core.security import verify_password, get_password_hash
 from app.db.session import SessionLocal
 
 from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ, ProductSocialTrustLink
-from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ
+from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ, SolutionSocialTrustLink
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
 
@@ -64,13 +66,6 @@ class QuillEditorWidget(TextArea):
         
         return Markup(str(textarea_html) + quill_html)
 
-def format_image_preview(model, attribute):
-    url = getattr(model, attribute)
-    if not url:
-        return ""
-
-    return Markup(f'<img src="{url}" height="40" style="border-radius: 4px; border: 1px solid #eee; background: white;" />')
-
 class RichTextField(TextAreaField):
     widget = QuillEditorWidget()
 
@@ -80,6 +75,89 @@ def format_relation_link(model, attribute):
         return ""
     name = str(related_obj)
     return Markup(f'<a href="?search={name}" style="text-decoration: underline; color: #3b82f6;">{name}</a>')
+
+def format_image_preview(model, attribute):
+    url = getattr(model, attribute)
+    if not url:
+        return ""
+    return Markup(f'<img src="{url}" height="40" style="border-radius: 4px; border: 1px solid #eee; background: white;" />')
+
+def format_long_text(model, attribute):
+    value = getattr(model, attribute)
+    if not value:
+        return ""
+    
+    safe_value = html.unescape(str(value))
+    unique_id = f"modal_{uuid.uuid4().hex}"
+    
+    html_content = f"""
+    <div style="
+        max-height: 120px; 
+        max-width: 600px; 
+        overflow: hidden; 
+        position: relative; 
+        margin-bottom: 8px; 
+        border: 1px solid #e5e7eb; 
+        padding: 12px; 
+        border-radius: 6px; 
+        background: #ffffff;
+        white-space: normal !important;
+        word-wrap: break-word;
+    ">
+        <div style="opacity: 0.9; font-size: 0.95em; color: #4b5563; line-height: 1.5;">
+            {safe_value}
+        </div>
+        <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 50px; background: linear-gradient(to bottom, transparent, #ffffff);"></div>
+    </div>
+    
+    <button type="button" 
+            onclick="document.getElementById('{unique_id}').style.display='flex'" 
+            style="background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+        <i class="fa-solid fa-expand"></i> Show Full Content
+    </button>
+
+    <div id="{unique_id}" 
+         style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999999; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+        <div style="background: white; width: 90%; max-width: 900px; height: 85%; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); display: flex; flex-direction: column; overflow: hidden;">
+            <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; background: #f9fafb;">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600; color: #111827;">Content Preview</h3>
+                <button onclick="document.getElementById('{unique_id}').style.display='none'" 
+                        style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280; padding: 4px 8px; border-radius: 4px;">
+                    &times;
+                </button>
+            </div>
+            <div style="padding: 2rem; overflow-y: auto; line-height: 1.6; font-size: 1rem; color: #374151; white-space: normal !important; word-wrap: break-word;">
+                {safe_value}
+            </div>
+        </div>
+    </div>
+    """
+    return Markup(html_content)
+
+def generate_unique_slug(db, model, source_text, current_id=None):
+    if not source_text:
+        return ""
+
+    slug = source_text.lower().strip()
+    slug = re.sub(r'[^\w\s-]', '', slug)
+    slug = re.sub(r'[\s_-]+', '-', slug)
+    
+    original_slug = slug
+    counter = 1
+    
+    while True:
+        query = db.query(model).filter(model.slug == slug)
+        
+        if current_id:
+            query = query.filter(model.id != current_id)
+            
+        if not query.first():
+            break
+            
+        slug = f"{original_slug}-{counter}"
+        counter += 1
+        
+    return slug
 
 class LineSeparatedListField(TextAreaField):
     def _value(self):
@@ -186,29 +264,61 @@ class ArticleAdmin(ModelView, model=Article):
     icon = "fa-solid fa-newspaper"
     
     column_list = [Article.title, Article.publisher, Article.published_at]
+    
+    column_details_list = [
+        Article.id, 
+        Article.title, 
+        Article.slug, 
+        Article.publisher, 
+        Article.categories, 
+        Article.summary, 
+        Article.content, 
+        Article.image_url, 
+        Article.published_at,
+        Article.created_at,
+        Article.updated_at
+    ]
+    
     column_searchable_list = [Article.title, Article.slug, Article.content, Article.summary]
     column_sortable_list = [Article.published_at, Article.title]
-    form_excluded_columns = [Article.created_at, Article.updated_at, Article.id]
+    
+    form_excluded_columns = [Article.created_at, Article.updated_at]
 
     form_ajax_refs = {
         "publisher": { "fields": ["name"], "order_by": "name", "placeholder": "Select Author..." },
         "categories": { "fields": ["name"], "order_by": "name", "placeholder": "Add Categories..." }
     }
     
-    # ✅ UPDATE: Both content AND summary now use RichTextField
-    form_overrides = dict(content=RichTextField, summary=RichTextField)
+    form_overrides = dict(content=RichTextField, summary=RichTextField, id=HiddenField)
     
     form_extra_fields = {
-        "slug": StringField("URL Slug (Auto-generated if empty)", validators=[Optional()]),
         "published_at": DateTimeField("Published Date (Leave empty for Now)", validators=[Optional()], format="%Y-%m-%d %H:%M:%S")
     }
 
     form_args = {
-        "summary": dict(label="Short Summary")
+        "summary": dict(label="Short Summary"),
+        "title": dict(validators=[DataRequired()]),
+        "slug": dict(
+            label="URL Slug (Auto-generated)", 
+            render_kw={"disabled": "disabled"},
+            validators=[Optional()] 
+        )
     }
     
     column_labels = {
         Article.image_url: "Cover Image URL"
+    }
+    
+    column_formatters = {
+        Article.image_url: format_image_preview,
+        Article.summary: format_long_text,
+        Article.content: format_long_text
+    }
+    
+    column_formatters_detail = {
+        Article.image_url: format_image_preview,
+        Article.summary: format_long_text,
+        Article.content: format_long_text
     }
 
     def get_query(self, request: Request):
@@ -222,46 +332,69 @@ class ArticleAdmin(ModelView, model=Article):
         return query
 
     async def on_model_change(self, data, model, is_created, request):
-        if not data.get("slug") and data.get("title"):
-            slug = data["title"].lower().strip()
-            slug = re.sub(r'[^\w\s-]', '', slug)
-            slug = re.sub(r'[\s_-]+', '-', slug)
-            data["slug"] = slug
+        db = SessionLocal()
+        try:
+            title = data.get("title", "").strip()
+            if title:
+                query = db.query(Article).filter(Article.title == title)
+                
+                if not is_created and model.id:
+                    query = query.filter(Article.id != model.id)
+                
+                duplicate = query.first()
+                if duplicate:
+                    db.close()
+                    raise ValidationError(f"An article with the title '{title}' already exists.")
 
-        if data.get("slug"):
-            db = SessionLocal()
-            try:
-                original_slug = data["slug"]
-                counter = 1
-                while True:
-                    query = db.query(Article).filter(Article.slug == data["slug"])
-                    if not is_created:
-                        query = query.filter(Article.id != model.id)
-                    
-                    if not query.first():
-                        break 
-                    
-                    data["slug"] = f"{original_slug}-{counter}"
-                    counter += 1
-            finally:
-                db.close()
+            if (is_created or not data.get("slug")) and data.get("title"):
+                data["slug"] = generate_unique_slug(db, Article, data["title"], model.id if not is_created else None)
 
-        if not data.get("published_at"):
-            data["published_at"] = datetime.now()
+            if not data.get("published_at"):
+                data["published_at"] = datetime.now()
 
-        role = request.session.get("role")
-        user_id = request.session.get("user_id")
+            role = request.session.get("role")
+            user_id = request.session.get("user_id")
 
-        if role != "admin" and is_created:
-            db = SessionLocal()
-            try:
+            if role != "admin" and is_created:
                 author = db.query(Author).filter(Author.user_id == user_id).first()
                 if author:
                     data["publisher_id"] = author.id
                 else:
+                    db.close()
                     raise ValidationError("You must have an Author Profile linked to your User to post.")
-            finally:
-                db.close()
+        finally:
+            db.close()
+
+    def on_model_change_error(self, request, form, error):
+        db = SessionLocal()
+        try:
+            if hasattr(form, 'publisher') and form.publisher.data:
+                val = form.publisher.data
+                if isinstance(val, (int, str)):
+                    if isinstance(val, str) and val.isdigit():
+                        val = int(val)
+                    if isinstance(val, int):
+                        author = db.query(Author).get(val)
+                        if author:
+                            form.publisher.data = author
+
+            if hasattr(form, 'categories') and form.categories.data:
+                new_cats = []
+                for val in form.categories.data:
+                    if isinstance(val, (int, str)):
+                        if isinstance(val, str) and val.isdigit():
+                            val = int(val)
+                        if isinstance(val, int):
+                            cat = db.query(Category).get(val)
+                            if cat:
+                                new_cats.append(cat)
+                        else:
+                            new_cats.append(val)
+                    else:
+                        new_cats.append(val)
+                form.categories.data = new_cats
+        finally:
+            db.close()  
 
 class AuthorAdmin(ModelView, model=Author):
     category = "Blog Manager"
@@ -292,36 +425,44 @@ class ProductAdmin(ModelView, model=Product):
     icon = "fa-solid fa-box-open"
     column_list = [Product.name, Product.slug, Product.category, Product.updated_at]
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
-    form_excluded_columns = [
-    Product.id, 
-    Product.created_at, 
-    Product.updated_at, 
-    Product.features, 
-    Product.why_us, 
-    Product.faqs, 
-    Product.trusted_by  
-    ]
-
+    form_excluded_columns = [Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.trusted_by]
+    
+    form_overrides = dict(hero_subtitle=TextAreaField, id=HiddenField)
+    
+    form_args = { 
+        "name": dict(validators=[DataRequired()]),
+        "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "slug": dict(
+            label="URL Slug (Auto-generated)", 
+            render_kw={"disabled": "disabled"},
+            validators=[Optional()]
+        )
+    }
+    
+    column_labels = { Product.hero_title: "Hero Banner Title", Product.hero_subtitle: "Hero Banner Text" }
+    
     column_formatters = {
         Product.hero_image: format_image_preview
     }
-    
-    form_overrides = dict(hero_subtitle=TextAreaField)
-    form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
-    column_labels = { Product.hero_title: "Hero Banner Title", Product.hero_subtitle: "Hero Banner Text" }
 
     async def on_model_change(self, data, model, is_created, request):
-        if data.get("slug"):
-            db = SessionLocal()
-            try:
-                query = db.query(Product).filter(Product.slug == data["slug"])
-                if not is_created:
+        db = SessionLocal()
+        try:
+            name = data.get("name", "").strip()
+            if name:
+                query = db.query(Product).filter(Product.name == name)
+                
+                if not is_created and model.id:
                     query = query.filter(Product.id != model.id)
                 
-                if query.first():
-                    raise ValidationError(f"Product Slug '{data['slug']}' already exists.")
-            finally:
-                db.close()
+                duplicate = query.first()
+                if duplicate:
+                    raise ValidationError(f"A product with the name '{name}' already exists.")
+
+            if (is_created or not data.get("slug")) and name:
+                data["slug"] = generate_unique_slug(db, Product, name, model.id if not is_created else None)
+        finally:
+            db.close()
 
 class ProductFeatureAdmin(ModelView, model=ProductFeature):
     category = "Product Manager"
@@ -356,6 +497,46 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
     form_excluded_columns = [ProductWhyUs.id, ProductWhyUs.created_at, ProductWhyUs.updated_at]
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
 
+class SocialTrustAdmin(ModelView, model=SocialTrust):
+    category = "Partners"
+    name = "Social Trust"
+    name_plural = "Partner Library"
+    icon = "fa-solid fa-handshake"
+
+    column_list = [SocialTrust.logo_url, SocialTrust.name, SocialTrust.sequence]
+    column_searchable_list = [SocialTrust.name]
+    column_sortable_list = [SocialTrust.sequence]
+    
+    column_formatters = {
+        SocialTrust.logo_url: format_image_preview
+    }
+    
+    column_labels = {
+        SocialTrust.logo_url: "Logo Preview"
+    }
+    
+    form_excluded_columns = [SocialTrust.id, SocialTrust.created_at, SocialTrust.updated_at]
+
+class ProductSocialTrustLinkAdmin(ModelView, model=ProductSocialTrustLink):
+    category = "Product Manager"
+    name = "Product Partner"
+    name_plural = "Assign Partners"
+    icon = "fa-solid fa-link"
+
+    column_list = [ProductSocialTrustLink.product, ProductSocialTrustLink.partner, ProductSocialTrustLink.sequence]
+    column_sortable_list = [ProductSocialTrustLink.product_id, ProductSocialTrustLink.sequence]
+    column_formatters = { 
+        ProductSocialTrustLink.product: format_relation_link,
+        ProductSocialTrustLink.partner: format_relation_link
+    }
+
+    form_excluded_columns = [ProductSocialTrustLink.id]
+    
+    form_ajax_refs = {
+        "product": { "fields": ["name"], "order_by": "name", "placeholder": "Select Product..." },
+        "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner..." }
+    }
+
 class ProductFAQAdmin(ModelView, model=ProductFAQ):
     category = "Product Manager"
     name = "Product FAQ"
@@ -380,26 +561,47 @@ class SolutionAdmin(ModelView, model=Solution):
     column_searchable_list = [Solution.name, Solution.hero_title]
     
     form_excluded_columns = [
-        Solution.id, Solution.created_at, Solution.updated_at, 
-        Solution.features, Solution.why_us, Solution.faqs, Solution.related_products
+        Solution.created_at, Solution.updated_at, 
+        Solution.features, Solution.why_us, Solution.faqs, Solution.related_products, Solution.trusted_by
     ]
     
-    form_overrides = dict(hero_subtitle=TextAreaField)
-    form_args = { "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}) }
+    form_overrides = dict(hero_subtitle=TextAreaField, id=HiddenField)
+    
+    form_args = { 
+        "name": dict(validators=[DataRequired()]),
+        "hero_subtitle": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "slug": dict(
+            label="URL Slug (Auto-generated)", 
+            render_kw={"disabled": "disabled"},
+            validators=[Optional()]
+        )
+    }
+    
     column_labels = { Solution.hero_title: "Hero Banner Title", Solution.hero_subtitle: "Hero Banner Text" }
+    
+    column_formatters = {
+        Solution.hero_image: format_image_preview,
+        Solution.cta_image: format_image_preview
+    }
 
     async def on_model_change(self, data, model, is_created, request):
-        if data.get("slug"):
-            db = SessionLocal()
-            try:
-                query = db.query(Solution).filter(Solution.slug == data["slug"])
-                if not is_created:
+        db = SessionLocal()
+        try:
+            name = data.get("name", "").strip()
+            if name:
+                query = db.query(Solution).filter(Solution.name == name)
+                
+                if not is_created and model.id:
                     query = query.filter(Solution.id != model.id)
                 
-                if query.first():
-                    raise ValidationError(f"Solution Slug '{data['slug']}' already exists.")
-            finally:
-                db.close()
+                duplicate = query.first()
+                if duplicate:
+                    raise ValidationError(f"A solution with the name '{name}' already exists.")
+
+            if (is_created or not data.get("slug")) and name:
+                data["slug"] = generate_unique_slug(db, Solution, name, model.id if not is_created else None)
+        finally:
+            db.close()
 
 class SolutionFeatureAdmin(ModelView, model=SolutionFeature):
     category = "Solution Manager"
@@ -453,6 +655,26 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
         "product": { "fields": ["name"], "order_by": "name", "placeholder": "Link to which Product?" }
     }
 
+class SolutionSocialTrustLinkAdmin(ModelView, model=SolutionSocialTrustLink):
+    category = "Solution Manager"
+    name = "Solution Partner"
+    name_plural = "Assign Partners"
+    icon = "fa-solid fa-link"
+
+    column_list = [SolutionSocialTrustLink.solution, SolutionSocialTrustLink.partner, SolutionSocialTrustLink.sequence]
+    column_sortable_list = [SolutionSocialTrustLink.solution_id, SolutionSocialTrustLink.sequence]
+    column_formatters = { 
+        SolutionSocialTrustLink.solution: format_relation_link,
+        SolutionSocialTrustLink.partner: format_relation_link
+    }
+
+    form_excluded_columns = [SolutionSocialTrustLink.id]
+    
+    form_ajax_refs = {
+        "solution": { "fields": ["name"], "order_by": "name", "placeholder": "Select Solution..." },
+        "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner..." }
+    }
+
 class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     category = "Solution Manager"
     name = "Solution FAQ"
@@ -467,38 +689,6 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     form_ajax_refs = { "solution": { "fields": ["name"], "order_by": "name", "placeholder": "Select Solution..." } }
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
-
-class SocialTrustAdmin(ModelView, model=SocialTrust):
-    category = "General Content"
-    name = "Social Trust / Partner"
-    name_plural = "Social Trusts"
-    icon = "fa-solid fa-handshake"
-
-    column_list = [SocialTrust.name, SocialTrust.logo_url, SocialTrust.sequence]
-    column_searchable_list = [SocialTrust.name]
-    column_sortable_list = [SocialTrust.sequence]
-    
-    column_formatters = {
-        SocialTrust.logo_url: format_image_preview
-    }
-    column_labels = {
-        SocialTrust.logo_url: "Logo Preview"
-    }
-
-    form_excluded_columns = [SocialTrust.id, SocialTrust.created_at, SocialTrust.updated_at]
-
-class ProductSocialTrustLinkAdmin(ModelView, model=ProductSocialTrustLink):
-    category = "Product Manager"
-    name = "Assign Partner"
-    name_plural = "Assign Partners to Products"
-    icon = "fa-solid fa-link"
-
-    column_list = [ProductSocialTrustLink.product, ProductSocialTrustLink.partner, ProductSocialTrustLink.sequence]
-    
-    form_ajax_refs = {
-        "product": { "fields": ["name"], "order_by": "name", "placeholder": "Select Product" },
-        "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner (Social Trust)" }
-    }
 
 def setup_admin(app, engine):
     admin = Admin(
@@ -519,13 +709,14 @@ def setup_admin(app, engine):
     admin.add_view(ProductWhyUsAdmin)
     admin.add_view(ProductFAQAdmin)
 
+    admin.add_view(SocialTrustAdmin)
+    admin.add_view(ProductSocialTrustLinkAdmin)
+
     admin.add_view(SolutionAdmin)
     admin.add_view(SolutionFeatureAdmin)
     admin.add_view(SolutionWhyUsAdmin)
-    admin.add_view(SolutionRelatedProductAdmin)
     admin.add_view(SolutionFAQAdmin)
-
-    admin.add_view(SocialTrustAdmin)
-    admin.add_view(ProductSocialTrustLinkAdmin)
+    admin.add_view(SolutionRelatedProductAdmin)
+    admin.add_view(SolutionSocialTrustLinkAdmin)
 
     return admin

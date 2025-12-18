@@ -9,14 +9,16 @@ from sqladmin import Admin
 from app.routers.v1 import product as product_v1
 from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
+from app.routers.v1 import social_trust as social_trust_v1
 from app.db.session import engine
 from app.core.config import settings
 from app.core.admin import (
     authentication_backend,
     UserAdmin,
-    ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin, ProductSocialTrustLinkAdmin, SocialTrustAdmin,
-    SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin,
-    ArticleAdmin, AuthorAdmin, CategoryAdmin
+    ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin, ProductSocialTrustLinkAdmin,
+    SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin, SolutionSocialTrustLinkAdmin,
+    ArticleAdmin, AuthorAdmin, CategoryAdmin,
+    SocialTrustAdmin
 )
 
 tags_metadata = [
@@ -36,6 +38,10 @@ tags_metadata = [
         "name": "Solutions",
         "description": "Endpoints for fetching Solution pages.",
     },
+    {
+        "name": "Social Trust",
+        "description": "Endpoints for fetching global partner logos.",
+    },
 ]
 
 app = FastAPI(
@@ -48,10 +54,8 @@ app = FastAPI(
 origins = [
     "http://localhost:3000",
     "http://localhost:3001",
-     # 👇 Tambahkan domain Vercel Anda di sini:
-    "https://corporate-website-solvera-9wek.vercel.app",  # Domain Preview yang sedang error
+    "https://corporate-website-solvera-9wek.vercel.app",
     "https://corporate-website-solvera.vercel.app"
-
 ]
 
 app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
@@ -62,15 +66,13 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    # 👇 OPSI TAMBAHAN (untuk Vercel):
-    # regex agar semua link preview Vercel otomatis diizinkan tanpa perlu add manual satu-satu
-    allow_origin_regex="https://corporate-website-solvera.*\.vercel\.app"
-
+    allow_origin_regex=r"https://corporate-website-solvera.*\.vercel\.app"
 )
 
 app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
 app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"])
 app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"])
+app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
@@ -87,6 +89,7 @@ admin.add_view(SolutionFeatureAdmin)
 admin.add_view(SolutionWhyUsAdmin)
 admin.add_view(SolutionFAQAdmin)
 admin.add_view(SolutionRelatedProductAdmin)
+admin.add_view(SolutionSocialTrustLinkAdmin)
 
 admin.add_view(ArticleAdmin)
 admin.add_view(AuthorAdmin)

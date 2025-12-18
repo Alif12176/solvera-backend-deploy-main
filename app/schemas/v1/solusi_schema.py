@@ -57,6 +57,12 @@ class FAQItem(ORMBase):
     answer: str
     sequence: Optional[int] = None
 
+class SocialTrustItem(ORMBase):
+    id: UUID
+    name: str
+    logo_url: str
+    sequence: int
+
 class Solution(ORMBase):
     id: UUID 
     slug: str
@@ -65,12 +71,18 @@ class Solution(ORMBase):
     
     hero_title: str
     hero_subtitle: Optional[str] = None
+    hero_image: Optional[str] = None
+
+    cta_primary_text: Optional[str] = None
+    cta_secondary_text: Optional[str] = None
+    cta_image: Optional[str] = None
 
     core_benefits: List[CoreBenefit] = [] 
     core_values: List[CoreValue] = []
     industry_section: Optional[IndustrySection] = None
     core_solution: Optional[CoreSolution] = None
     faqs: List[FAQItem] = []
+    trusted_by: List[SocialTrustItem] = []
 
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

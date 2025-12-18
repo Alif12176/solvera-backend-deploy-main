@@ -1,11 +1,11 @@
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_
 from typing import List, Optional
-from app.models.solutions import Solution, SolutionRelatedProduct
+from app.models.solutions import Solution, SolutionRelatedProduct, SolutionSocialTrustLink
 from app.schemas.v1.solusi_schema import (
     Solution as SolutionSchema, 
     CoreBenefit, CoreValue, IndustrySection, IndustryItem, 
-    CoreSolution, CoreSolutionItem, FAQItem
+    CoreSolution, CoreSolutionItem, FAQItem, SocialTrustItem
 )
 
 def _map_to_schema(solution_db: Solution) -> SolutionSchema:
@@ -72,7 +72,6 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
             industries=industry_items
         )
 
-    # 5. FAQs
     faq_list = [
         FAQItem(
             id=faq.id,
@@ -82,6 +81,18 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
         ) for faq in solution_db.faqs
     ]
 
+    trusted_list = []
+    if solution_db.trusted_by:
+        sorted_links = sorted(solution_db.trusted_by, key=lambda x: x.sequence or 0)
+        for link in sorted_links:
+            if link.partner:
+                trusted_list.append(SocialTrustItem(
+                    id=link.partner.id,
+                    name=link.partner.name,
+                    logo_url=link.partner.logo_url,
+                    sequence=link.sequence
+                ))
+
     return SolutionSchema(
         id=solution_db.id,
         slug=solution_db.slug,
@@ -89,11 +100,16 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
         category=solution_db.category,
         hero_title=solution_db.hero_title,
         hero_subtitle=solution_db.hero_subtitle,
+        hero_image=solution_db.hero_image,
+        cta_primary_text=solution_db.cta_primary_text,
+        cta_secondary_text=solution_db.cta_secondary_text,
+        cta_image=solution_db.cta_image,
         core_benefits=core_benefits_list,
         core_values=core_values_list,
         industry_section=industry_section_obj,
         core_solution=core_solution_obj,
         faqs=faq_list,
+        trusted_by=trusted_list,
         created_at=solution_db.created_at,
         updated_at=solution_db.updated_at
     )
@@ -103,7 +119,8 @@ def get_solution_by_slug(db: Session, slug: str) -> Optional[SolutionSchema]:
         joinedload(Solution.features),
         joinedload(Solution.why_us),
         joinedload(Solution.faqs),
-        joinedload(Solution.related_products).joinedload(SolutionRelatedProduct.product)
+        joinedload(Solution.related_products).joinedload(SolutionRelatedProduct.product),
+        joinedload(Solution.trusted_by).joinedload(SolutionSocialTrustLink.partner)
     ).filter(Solution.slug == slug).first()
 
     if not solution_db:
@@ -118,7 +135,8 @@ def get_all_solutions(db: Session, page: int = 1, page_size: int = 10, search: s
         joinedload(Solution.features),
         joinedload(Solution.why_us),
         joinedload(Solution.faqs),
-        joinedload(Solution.related_products).joinedload(SolutionRelatedProduct.product)
+        joinedload(Solution.related_products).joinedload(SolutionRelatedProduct.product),
+        joinedload(Solution.trusted_by).joinedload(SolutionSocialTrustLink.partner)
     )
 
     if search:

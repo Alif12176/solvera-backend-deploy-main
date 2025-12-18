@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
+from app.models.social_trust import SocialTrust
 
 class Solution(Base):
     __tablename__ = "solutions"
@@ -15,6 +16,11 @@ class Solution(Base):
     
     hero_title = Column(Text, nullable=False)
     hero_subtitle = Column(Text, nullable=True)
+    hero_image = Column(String, nullable=True)
+
+    cta_primary_text = Column(String, nullable=True)
+    cta_secondary_text = Column(String, nullable=True)
+    cta_image = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -23,6 +29,7 @@ class Solution(Base):
     why_us = relationship("SolutionWhyUs", back_populates="solution", order_by="SolutionWhyUs.sequence", cascade="all, delete-orphan")
     faqs = relationship("SolutionFAQ", back_populates="solution", order_by="SolutionFAQ.sequence", cascade="all, delete-orphan")
     related_products = relationship("SolutionRelatedProduct", back_populates="solution", order_by="SolutionRelatedProduct.sequence", cascade="all, delete-orphan")
+    trusted_by = relationship("SolutionSocialTrustLink", back_populates="solution", order_by="SolutionSocialTrustLink.sequence", cascade="all, delete-orphan")
 
     def __str__(self):
         return self.name
@@ -104,3 +111,18 @@ class SolutionFAQ(Base):
 
     def __str__(self):
         return self.question
+
+class SolutionSocialTrustLink(Base):
+    __tablename__ = "solution_social_trust_links"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    solution_id = Column(UUID(as_uuid=True), ForeignKey("solutions.id"))
+    social_trust_id = Column(UUID(as_uuid=True), ForeignKey("social_trusts.id"))
+    
+    sequence = Column(Integer, default=0, index=True)
+
+    solution = relationship("Solution", back_populates="trusted_by")
+    partner = relationship("app.models.social_trust.SocialTrust") 
+
+    def __str__(self):
+        return f"Solution Link"

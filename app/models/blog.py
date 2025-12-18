@@ -59,8 +59,8 @@ class Article(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     
     publisher_id = Column(Integer, ForeignKey("authors.id"), nullable=False)
-    title = Column(String, nullable=False)
-    slug = Column(String, unique=True, index=True, nullable=False)
+    title = Column(String, nullable=False, unique=True)
+    slug = Column(String, unique=True, index=True, nullable=True)
     summary = Column(Text, nullable=True)
     content = Column(Text, nullable=False)
     image_url = Column(String, nullable=True) 
