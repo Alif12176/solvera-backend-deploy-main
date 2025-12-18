@@ -49,8 +49,8 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
     core_solution_obj = None
     if core_sol_items:
         core_solution_obj = CoreSolution(
-            section_title="Keunggulan Solusi",
-            section_subtitle=None,
+            section_title=solution_db.core_solution_title or "Keunggulan Solusi",
+            section_subtitle=solution_db.core_solution_subtitle,
             items=core_sol_items
         )
 
@@ -60,6 +60,7 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
             industry_items.append(IndustryItem(
                 id=rp.product.id,
                 name=rp.product.name,
+                icon=rp.icon_url, 
                 description=rp.product.hero_subtitle,
                 sequence=rp.sequence
             ))

@@ -22,6 +22,9 @@ class Solution(Base):
     cta_secondary_text = Column(String, nullable=True)
     cta_image = Column(String, nullable=True)
 
+    core_solution_title = Column(String, nullable=True, default="Keunggulan Solusi")
+    core_solution_subtitle = Column(Text, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -83,7 +86,7 @@ class SolutionRelatedProduct(Base):
     solution_id = Column(UUID(as_uuid=True), ForeignKey("solutions.id"))
     
     product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"))
-    
+    icon_url = Column(String, nullable=True)
     sequence = Column(Integer, default=0, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

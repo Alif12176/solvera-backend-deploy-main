@@ -29,11 +29,11 @@ class CoreValue(ORMBase):
 class IndustryItem(ORMBase):
     id: Optional[UUID] = None
     name: str
+    icon: Optional[str] = None
     description: Optional[str] = None
     sequence: Optional[int] = None
 
 class IndustrySection(ORMBase):
-    id: Optional[UUID] = None
     section_title: Optional[str] = None
     section_subtitle: Optional[str] = None
     industries: List[IndustryItem] = []
@@ -46,7 +46,6 @@ class CoreSolutionItem(ORMBase):
     sequence: Optional[int] = None
 
 class CoreSolution(ORMBase):
-    id: Optional[UUID] = None
     section_title: Optional[str] = None
     section_subtitle: Optional[str] = None
     items: List[CoreSolutionItem] = []

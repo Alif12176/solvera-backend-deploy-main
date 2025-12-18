@@ -19,6 +19,36 @@ from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, Solut
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
 
+def unique_article_title_validator(form, field):
+    if field.object_data == field.data:
+        return
+
+    db = SessionLocal()
+    try:
+        existing = db.query(Article).filter(Article.title == field.data).first()
+        
+        if existing:
+            if hasattr(form, 'publisher') and form.publisher.data:
+                if isinstance(form.publisher.data, str) and form.publisher.data.isdigit():
+                    author_obj = db.query(Author).get(int(form.publisher.data))
+                    if author_obj:
+                        form.publisher.data = author_obj
+
+            if hasattr(form, 'categories') and form.categories.data:
+                new_data = []
+                for item in form.categories.data:
+                    if isinstance(item, str) and item.isdigit():
+                        cat_obj = db.query(Category).get(int(item))
+                        if cat_obj:
+                            new_data.append(cat_obj)
+                    else:
+                        new_data.append(item)
+                form.categories.data = new_data
+
+            raise ValidationError(f"An article with the title '{field.data}' already exists.")
+    finally:
+        db.close()
+
 class QuillEditorWidget(TextArea):
     def __call__(self, field, **kwargs):
         kwargs['style'] = 'display:none;'
@@ -297,7 +327,7 @@ class ArticleAdmin(ModelView, model=Article):
 
     form_args = {
         "summary": dict(label="Short Summary"),
-        "title": dict(validators=[DataRequired()]),
+        "title": dict(validators=[DataRequired(), unique_article_title_validator]),
         "slug": dict(
             label="URL Slug (Auto-generated)", 
             render_kw={"disabled": "disabled"},
@@ -334,18 +364,6 @@ class ArticleAdmin(ModelView, model=Article):
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
-            title = data.get("title", "").strip()
-            if title:
-                query = db.query(Article).filter(Article.title == title)
-                
-                if not is_created and model.id:
-                    query = query.filter(Article.id != model.id)
-                
-                duplicate = query.first()
-                if duplicate:
-                    db.close()
-                    raise ValidationError(f"An article with the title '{title}' already exists.")
-
             if (is_created or not data.get("slug")) and data.get("title"):
                 data["slug"] = generate_unique_slug(db, Article, data["title"], model.id if not is_created else None)
 
@@ -360,7 +378,6 @@ class ArticleAdmin(ModelView, model=Article):
                 if author:
                     data["publisher_id"] = author.id
                 else:
-                    db.close()
                     raise ValidationError("You must have an Author Profile linked to your User to post.")
         finally:
             db.close()
@@ -565,7 +582,11 @@ class SolutionAdmin(ModelView, model=Solution):
         Solution.features, Solution.why_us, Solution.faqs, Solution.related_products, Solution.trusted_by
     ]
     
-    form_overrides = dict(hero_subtitle=TextAreaField, id=HiddenField)
+    form_overrides = dict(
+        hero_subtitle=TextAreaField,
+        core_solution_subtitle=TextAreaField, 
+        id=HiddenField
+    )
     
     form_args = { 
         "name": dict(validators=[DataRequired()]),
@@ -574,10 +595,23 @@ class SolutionAdmin(ModelView, model=Solution):
             label="URL Slug (Auto-generated)", 
             render_kw={"disabled": "disabled"},
             validators=[Optional()]
+        ),
+        "core_solution_title": dict(
+            label="Section Title (Keunggulan Solusi)",
+            render_kw={"placeholder": "e.g. Keunggulan Solusi"}
+        ),
+        "core_solution_subtitle": dict(
+            label="Section Subtitle (Keunggulan Solusi)",
+            render_kw={"rows": 3, "style": "width: 100%;"}
         )
     }
     
-    column_labels = { Solution.hero_title: "Hero Banner Title", Solution.hero_subtitle: "Hero Banner Text" }
+    column_labels = { 
+        Solution.hero_title: "Hero Banner Title", 
+        Solution.hero_subtitle: "Hero Banner Text",
+        Solution.core_solution_title: "Core Section Title",
+        Solution.core_solution_subtitle: "Core Section Subtitle"
+    }
     
     column_formatters = {
         Solution.hero_image: format_image_preview,
@@ -642,11 +676,20 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
     name_plural = "Related Products"
     icon = "fa-solid fa-link"
 
-    column_list = [SolutionRelatedProduct.solution, SolutionRelatedProduct.product, SolutionRelatedProduct.sequence]
+    column_list = [
+        SolutionRelatedProduct.solution, 
+        SolutionRelatedProduct.product, 
+        SolutionRelatedProduct.icon_url, 
+        SolutionRelatedProduct.sequence
+    ]
     column_searchable_list = ["solution.name", "product.name"]
     column_formatters = { 
         SolutionRelatedProduct.solution: format_relation_link,
-        SolutionRelatedProduct.product: format_relation_link 
+        SolutionRelatedProduct.product: format_relation_link,
+        SolutionRelatedProduct.icon_url: format_image_preview
+    }
+    column_labels = {
+        SolutionRelatedProduct.icon_url: "Icon URL (e.g., SVG/PNG)"
     }
 
     form_excluded_columns = [SolutionRelatedProduct.id, SolutionRelatedProduct.created_at, SolutionRelatedProduct.updated_at]
