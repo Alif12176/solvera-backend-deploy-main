@@ -9,19 +9,25 @@ from app.schemas.v1.solusi_schema import (
 )
 
 def _map_to_schema(solution_db: Solution) -> SolutionSchema:
-    core_benefits_list = [
-        CoreBenefit(
-            id=f.id,
-            section_title=None, 
-            section_subtitle=None,
-            tab_label=f.tab_label,
-            content_title=f.content_title,
-            content_description=f.content_description,
-            values=f.benefits or [],
-            sequence=f.sequence
-        ) for f in solution_db.features
-    ]
-
+    core_benefits_list = []
+    sorted_features = sorted(solution_db.features, key=lambda x: x.sequence or 0)
+    for i, f in enumerate(sorted_features):
+        s_title = solution_db.core_benefits_title if i == 0 else None
+        s_subtitle = solution_db.core_benefits_subtitle if i == 0 else None
+        
+        core_benefits_list.append(
+            CoreBenefit(
+                id=f.id,
+                section_title=s_title, 
+                section_subtitle=s_subtitle,
+                tab_label=f.tab_label,
+                content_title=f.content_title,
+                content_description=f.content_description,
+                values=f.benefits or [],
+                sequence=f.sequence
+            )
+        )
+    
     core_values_list = [
         CoreValue(
             id=w.id,

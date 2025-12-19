@@ -22,6 +22,9 @@ class Solution(Base):
     cta_secondary_text = Column(String, nullable=True)
     cta_image = Column(String, nullable=True)
 
+    core_benefits_title = Column(String, nullable=True, default="Core Benefits")
+    core_benefits_subtitle = Column(Text, nullable=True)
+
     core_solution_title = Column(String, nullable=True, default="Keunggulan Solusi")
     core_solution_subtitle = Column(Text, nullable=True)
 
@@ -42,7 +45,7 @@ class SolutionFeature(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     solution_id = Column(UUID(as_uuid=True), ForeignKey("solutions.id"))
-    
+
     tab_label = Column(String, nullable=True) 
     content_title = Column(String, nullable=True) 
     content_description = Column(Text, nullable=True)

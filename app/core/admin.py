@@ -364,7 +364,10 @@ class ArticleAdmin(ModelView, model=Article):
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
-            if (is_created or not data.get("slug")) and data.get("title"):
+            if not is_created and model.slug:
+                if "slug" in data:
+                    del data["slug"]
+            elif data.get("title"):
                 data["slug"] = generate_unique_slug(db, Article, data["title"], model.id if not is_created else None)
 
             if not data.get("published_at"):
@@ -476,7 +479,10 @@ class ProductAdmin(ModelView, model=Product):
                 if duplicate:
                     raise ValidationError(f"A product with the name '{name}' already exists.")
 
-            if (is_created or not data.get("slug")) and name:
+            if not is_created and model.slug:
+                if "slug" in data:
+                    del data["slug"]
+            elif name:
                 data["slug"] = generate_unique_slug(db, Product, name, model.id if not is_created else None)
         finally:
             db.close()
@@ -584,7 +590,8 @@ class SolutionAdmin(ModelView, model=Solution):
     
     form_overrides = dict(
         hero_subtitle=TextAreaField,
-        core_solution_subtitle=TextAreaField, 
+        core_solution_subtitle=TextAreaField,
+        core_benefits_subtitle=TextAreaField,
         id=HiddenField
     )
     
@@ -596,21 +603,27 @@ class SolutionAdmin(ModelView, model=Solution):
             render_kw={"disabled": "disabled"},
             validators=[Optional()]
         ),
+        "core_benefits_title": dict(
+            label="Benefits Section Title",
+            render_kw={"placeholder": "e.g. Benefits"}
+        ),
+        "core_benefits_subtitle": dict(
+            label="Benefits Section Subtitle",
+            render_kw={"rows": 3, "style": "width: 100%;"}
+        ),
         "core_solution_title": dict(
-            label="Section Title (Keunggulan Solusi)",
+            label="Solution Section Title",
             render_kw={"placeholder": "e.g. Keunggulan Solusi"}
         ),
         "core_solution_subtitle": dict(
-            label="Section Subtitle (Keunggulan Solusi)",
+            label="Solution Section Subtitle",
             render_kw={"rows": 3, "style": "width: 100%;"}
         )
     }
     
     column_labels = { 
         Solution.hero_title: "Hero Banner Title", 
-        Solution.hero_subtitle: "Hero Banner Text",
-        Solution.core_solution_title: "Core Section Title",
-        Solution.core_solution_subtitle: "Core Section Subtitle"
+        Solution.hero_subtitle: "Hero Banner Text"
     }
     
     column_formatters = {
@@ -632,7 +645,10 @@ class SolutionAdmin(ModelView, model=Solution):
                 if duplicate:
                     raise ValidationError(f"A solution with the name '{name}' already exists.")
 
-            if (is_created or not data.get("slug")) and name:
+            if not is_created and model.slug:
+                if "slug" in data:
+                    del data["slug"]
+            elif name:
                 data["slug"] = generate_unique_slug(db, Solution, name, model.id if not is_created else None)
         finally:
             db.close()
