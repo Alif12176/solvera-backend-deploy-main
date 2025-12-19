@@ -8,6 +8,7 @@ from app.db.base import Base
 from app.models.product import Product 
 from app.models.blog import Article, Category, Author
 from app.models.solutions import Solution 
+from app.models.service import ServicePage
 from app.core.config import settings   
 config = context.config
 
