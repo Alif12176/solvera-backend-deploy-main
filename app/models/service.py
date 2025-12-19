@@ -1,108 +1,91 @@
 from uuid import uuid4
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
-from app.models.social_trust import SocialTrust
 
-class Service(Base):
-    __tablename__ = "services"
+class ServicePage(Base):
+    __tablename__ = "service_pages"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     slug = Column(String, unique=True, index=True) 
-    name = Column(Text, nullable=False)
+    page_name = Column(Text, nullable=False)
     
-    hero_title = Column(Text, nullable=False)
-    hero_subtitle = Column(Text, nullable=True)
-    hero_image = Column(String, nullable=True)
+    hero_heading = Column(Text, nullable=False)
+    hero_tagline = Column(Text, nullable=True)
+    hero_bg_image = Column(String, nullable=True)
 
-    cta_primary_text = Column(String, nullable=True)
-    cta_secondary_text = Column(String, nullable=True)
-    cta_image = Column(String, nullable=True)
+    focus_section_heading = Column(Text, nullable=True)
+    focus_section_desc = Column(Text, nullable=True)
+    quick_step_heading = Column(Text, nullable=True)
+    quick_step_subheading = Column(Text, nullable=True)
+    methodology_heading = Column(Text, nullable=True)
+    methodology_desc = Column(Text, nullable=True)
+    competency_heading = Column(Text, nullable=True)
+    competency_desc = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    features = relationship("ServiceFeature", back_populates="service", order_by="ServiceFeature.sequence", cascade="all, delete-orphan")
-    processes = relationship("ServiceProcess", back_populates="service", order_by="ServiceProcess.sequence", cascade="all, delete-orphan")
-    faqs = relationship("ServiceFAQ", back_populates="service", order_by="ServiceFAQ.sequence", cascade="all, delete-orphan")
-    trusted_by = relationship("ServiceSocialTrustLink", back_populates="service", order_by="ServiceSocialTrustLink.sequence", cascade="all, delete-orphan")
+    focus_items = relationship("ServiceFocusItem", back_populates="service_page", order_by="ServiceFocusItem.display_order", cascade="all, delete-orphan")
+    quick_steps = relationship("ServiceQuickStep", back_populates="service_page", order_by="ServiceQuickStep.step_order", cascade="all, delete-orphan")
+    methodologies = relationship("ServiceMethodology", back_populates="service_page", order_by="ServiceMethodology.phase_order", cascade="all, delete-orphan")
+    competencies = relationship("ServiceCompetency", back_populates="service_page", order_by="ServiceCompetency.rank_order", cascade="all, delete-orphan")
 
     def __str__(self):
-        return self.name
+        return self.page_name
 
-class ServiceFeature(Base):
-    __tablename__ = "service_features"
+class ServiceFocusItem(Base):
+    __tablename__ = "service_focus_items"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"))
+    service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
     
-    section_type = Column(String, default="GENERAL", index=True)
+    card_title = Column(Text, nullable=False)
+    card_desc = Column(Text, nullable=True)
+    icon_image = Column(String, nullable=True)
     
-    title = Column(Text, nullable=False)    
-    description = Column(Text, nullable=True)
-    icon = Column(String, nullable=True)
+    display_order = Column(Integer, default=0, index=True)
     
-    sequence = Column(Integer, default=0, index=True)
-    
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    service_page = relationship("ServicePage", back_populates="focus_items")
 
-    service = relationship("Service", back_populates="features")
-
-    def __str__(self):
-        return self.title
-
-class ServiceProcess(Base):
-    __tablename__ = "service_processes"
+class ServiceQuickStep(Base):
+    __tablename__ = "service_quick_steps"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"))
+    service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
     
-    step_number = Column(String, nullable=True)
-    title = Column(Text, nullable=False)
-    description = Column(Text, nullable=True)
+    step_label = Column(String, nullable=True)
+    step_title = Column(Text, nullable=False)
+    step_desc = Column(Text, nullable=True)
     
-    sequence = Column(Integer, default=0, index=True)
+    step_order = Column(Integer, default=0, index=True)
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    service_page = relationship("ServicePage", back_populates="quick_steps")
 
-    service = relationship("Service", back_populates="processes")
-
-    def __str__(self):
-        return f"{self.step_number} - {self.title}"
-
-class ServiceFAQ(Base):
-    __tablename__ = "service_faqs"
+class ServiceMethodology(Base):
+    __tablename__ = "service_methodologies"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"))
+    service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
     
-    question = Column(Text, nullable=False)
-    answer = Column(Text, nullable=False)
-
-    sequence = Column(Integer, default=0, index=True)
+    phase_number = Column(String, nullable=True)
+    phase_title = Column(Text, nullable=False)
+    phase_desc = Column(Text, nullable=True)
     
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    phase_order = Column(Integer, default=0, index=True)
+    
+    service_page = relationship("ServicePage", back_populates="methodologies")
 
-    service = relationship("Service", back_populates="faqs")
-
-    def __str__(self):
-        return self.question
-
-class ServiceSocialTrustLink(Base):
-    __tablename__ = "service_social_trust_links"
+class ServiceCompetency(Base):
+    __tablename__ = "service_competencies"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
-    service_id = Column(UUID(as_uuid=True), ForeignKey("services.id"))
-    social_trust_id = Column(UUID(as_uuid=True), ForeignKey("social_trusts.id"))
+    service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
     
-    sequence = Column(Integer, default=0, index=True)
-
-    service = relationship("Service", back_populates="trusted_by")
-    partner = relationship("app.models.social_trust.SocialTrust") 
-
-    def __str__(self):
-        return f"Service Partner Link"
+    skill_name = Column(String, nullable=False)
+    percentage_value = Column(Integer, nullable=False)
+    
+    rank_order = Column(Integer, default=0, index=True)
+    
+    service_page = relationship("ServicePage", back_populates="competencies")
