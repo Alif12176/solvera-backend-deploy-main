@@ -7,8 +7,6 @@ class ORMBase(BaseModel):
     class Config:
         from_attributes = True 
 
-# --- Child Schemas (Required so Pydantic can extract data from ORM) ---
-
 class ServiceFocusItemSchema(ORMBase):
     id: UUID
     card_title: str
@@ -49,8 +47,6 @@ class ServiceCompetencySchema(ORMBase):
     percentage_value: int
     rank_order: Optional[int] = 0
 
-# --- Main Schema ---
-
 class ServicePageSchema(ORMBase):
     id: UUID 
     slug: str
@@ -59,33 +55,28 @@ class ServicePageSchema(ORMBase):
     hero_heading: str
     hero_tagline: Optional[str] = None
     hero_bg_image: Optional[str] = None
-    
-    # Focus Section Fields
+
     focus_section_tagline: Optional[str] = None
     focus_section_heading: Optional[str] = None
     focus_section_desc: Optional[str] = None
     focus_items: List[ServiceFocusItemSchema] = []
 
-    # Quick Steps Fields
     quick_step_layout: str = 'steps'
     quick_step_heading: Optional[str] = None
     quick_step_subheading: Optional[str] = None
     quick_step_footer: Optional[str] = None
     quick_steps: List[ServiceQuickStepSchema] = []
 
-    # Offerings Fields
     offering_heading: Optional[str] = None
     offering_desc: Optional[str] = None
     offerings: List[ServiceOfferingSchema] = []
 
-    # Methodology Fields
     methodology_layout: str = 'timeline'
     methodology_footer: Optional[str] = None
     methodology_heading: Optional[str] = None
     methodology_desc: Optional[str] = None
     methodologies: List[ServiceMethodologySchema] = []
 
-    # Competency Fields
     competency_footer: Optional[str] = None
     competency_heading: Optional[str] = None
     competency_desc: Optional[str] = None
@@ -96,7 +87,6 @@ class ServicePageSchema(ORMBase):
 
     @model_serializer(mode='wrap')
     def dynamic_response_structure(self, handler) -> dict[str, Any]:
-        # 1. Basic Data
         data = {
             "id": self.id,
             "slug": self.slug,
@@ -110,7 +100,6 @@ class ServicePageSchema(ORMBase):
             "updated_at": self.updated_at
         }
 
-        # 2. Focus Section (Only add if items exist)
         if self.focus_items:
             data['focus_section'] = {
                 "tagline": self.focus_section_tagline,
@@ -127,17 +116,14 @@ class ServicePageSchema(ORMBase):
                 ]
             }
 
-        # 3. Quick Steps / Standards Section
         if self.quick_steps:
             layout = self.quick_step_layout
             items_data = []
-            
-            # Sort by step_order
+
             sorted_steps = sorted(self.quick_steps, key=lambda x: x.step_order or 0)
             
             for s in sorted_steps:
                 if layout == 'steps':
-                    # Structure 1: Horizontal Steps (Page 1 & 3)
                     items_data.append({
                         "type": "step",
                         "id": s.id,
@@ -146,7 +132,6 @@ class ServicePageSchema(ORMBase):
                         "description": s.step_desc
                     })
                 elif layout == 'standards_grid':
-                    # Structure 2: Checklist Cards (Page 2)
                     items_data.append({
                         "type": "standard_card",
                         "id": s.id,
@@ -155,14 +140,13 @@ class ServicePageSchema(ORMBase):
                     })
 
             data['quick_steps_section'] = {
-                "layout": layout, # 'steps' or 'standards_grid'
+                "layout": layout,
                 "heading": self.quick_step_heading,
                 "subheading": self.quick_step_subheading,
                 "footer": self.quick_step_footer,
                 "items": items_data
             }
 
-        # 4. Offerings Section (Only Page 3 has this)
         if self.offerings:
             data['offerings_section'] = {
                 "heading": self.offering_heading,
@@ -183,7 +167,6 @@ class ServicePageSchema(ORMBase):
                 ]
             }
 
-        # 5. Methodology Section
         if self.methodologies:
             layout = self.methodology_layout
             meth_data = []
@@ -198,14 +181,12 @@ class ServicePageSchema(ORMBase):
                 }
                 
                 if layout == 'timeline':
-                    # Structure 1: Vertical Timeline (Page 1)
                     meth_data.append({
                         **base_item,
                         "type": "timeline_phase",
                         "number": m.phase_number
                     })
                 elif layout == 'roles_grid':
-                    # Structure 2: Icon Grid (Page 2 & 3)
                     meth_data.append({
                         **base_item,
                         "type": "role_card",
@@ -213,14 +194,13 @@ class ServicePageSchema(ORMBase):
                     })
 
             data['methodology_section'] = {
-                "layout": layout, # 'timeline' or 'roles_grid'
+                "layout": layout,
                 "heading": self.methodology_heading,
                 "description": self.methodology_desc,
                 "footer": self.methodology_footer,
                 "items": meth_data
             }
 
-        # 6. Competency Section
         if self.competencies:
             data['competency_section'] = {
                 "heading": self.competency_heading,

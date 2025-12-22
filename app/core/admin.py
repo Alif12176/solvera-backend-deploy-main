@@ -772,6 +772,8 @@ class ServicePageAdmin(ModelView, model=ServicePage):
     icon = "fa-solid fa-layer-group"
     
     column_list = [ServicePage.page_name, ServicePage.slug, ServicePage.updated_at]
+    column_searchable_list = [ServicePage.page_name, ServicePage.slug, ServicePage.hero_heading]
+    
     form_excluded_columns = [
         ServicePage.id, ServicePage.created_at, ServicePage.updated_at,
         ServicePage.focus_items, ServicePage.quick_steps, 
@@ -789,7 +791,6 @@ class ServicePageAdmin(ModelView, model=ServicePage):
         competency_desc=TextAreaField,
         competency_footer=TextAreaField,
         
-        # Dropdowns for layout selection
         quick_step_layout=SelectField,
         methodology_layout=SelectField
     )
@@ -797,15 +798,36 @@ class ServicePageAdmin(ModelView, model=ServicePage):
     form_args = {
         "slug": dict(label="URL Slug (Auto-generated)", render_kw={"disabled": "disabled"}, validators=[Optional()]),
         "page_name": dict(label="Internal Page Name (e.g. Konsultasi)"),
+        "hero_tagline": dict(label="Hero Tagline", render_kw={"rows": 3, "style": "width: 100%;"}),
+        "hero_heading": dict(label="Hero Heading", render_kw={"style": "width: 100%;"}),
+        "hero_bg_image": dict(label="Hero Background Image URL", render_kw={"style": "width: 100%;"}),
+        
+        "focus_section_tagline": dict(label="Focus Section Tagline", render_kw={"style": "width: 100%;"}),
+        "focus_section_heading": dict(label="Focus Section Heading", render_kw={"style": "width: 100%;"}),
+        "focus_section_desc": dict(label="Focus Section Description", render_kw={"rows": 4, "style": "width: 100%;"}),
         
         "quick_step_layout": dict(
             choices=[("steps", "Horizontal Steps (1,2,3)"), ("standards_grid", "Standards Grid (Checklists)")],
             label="Quick Step Layout"
         ),
+        "quick_step_heading": dict(label="Quick Step Heading", render_kw={"style": "width: 100%;"}),
+        "quick_step_subheading": dict(label="Quick Step Subheading", render_kw={"rows": 3, "style": "width: 100%;"}),
+        "quick_step_footer": dict(label="Quick Step Footer Text", render_kw={"rows": 3, "style": "width: 100%;"}),
+
+        "offering_heading": dict(label="Offering Section Heading", render_kw={"style": "width: 100%;"}),
+        "offering_desc": dict(label="Offering Section Description", render_kw={"rows": 4, "style": "width: 100%;"}),
+
         "methodology_layout": dict(
             choices=[("timeline", "Vertical Timeline (01, 02)"), ("roles_grid", "Icon Grid (Roles)")],
             label="Methodology Layout"
-        )
+        ),
+        "methodology_heading": dict(label="Methodology Heading", render_kw={"style": "width: 100%;"}),
+        "methodology_desc": dict(label="Methodology Description", render_kw={"rows": 4, "style": "width: 100%;"}),
+        "methodology_footer": dict(label="Methodology Footer Text", render_kw={"rows": 3, "style": "width: 100%;"}),
+
+        "competency_heading": dict(label="Competency Heading", render_kw={"style": "width: 100%;"}),
+        "competency_desc": dict(label="Competency Description", render_kw={"rows": 4, "style": "width: 100%;"}),
+        "competency_footer": dict(label="Competency Footer Text", render_kw={"rows": 3, "style": "width: 100%;"}),
     }
     
     column_formatters = {
@@ -824,9 +846,25 @@ class ServiceFocusItemAdmin(ModelView, model=ServiceFocusItem):
     icon = "fa-solid fa-border-all"
     
     column_list = [ServiceFocusItem.service_page, ServiceFocusItem.card_title, ServiceFocusItem.display_order]
+    column_searchable_list = ["service_page.page_name", ServiceFocusItem.card_title, ServiceFocusItem.card_desc]
+    
     form_excluded_columns = [ServiceFocusItem.id]
     form_overrides = dict(card_desc=TextAreaField)
-    form_args = { "card_desc": dict(render_kw={"rows": 4}) }
+    
+    column_labels = {
+        ServiceFocusItem.service_page: "Parent Service Page",
+        ServiceFocusItem.card_title: "Title",
+        ServiceFocusItem.card_desc: "Description",
+        ServiceFocusItem.icon_image: "Icon URL",
+        ServiceFocusItem.display_order: "Display Order"
+    }
+
+    form_args = { 
+        "card_title": dict(render_kw={"style": "width: 100%;"}),
+        "card_desc": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "icon_image": dict(render_kw={"style": "width: 100%;"}),
+        "display_order": dict(render_kw={"style": "width: 100%;"})
+    }
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
     
     column_formatters = { ServiceFocusItem.icon_image: format_image_preview }
@@ -837,12 +875,27 @@ class ServiceQuickStepAdmin(ModelView, model=ServiceQuickStep):
     icon = "fa-solid fa-forward"
     
     column_list = [ServiceQuickStep.service_page, ServiceQuickStep.step_title, ServiceQuickStep.step_order]
+    column_searchable_list = ["service_page.page_name", ServiceQuickStep.step_title, ServiceQuickStep.step_desc]
+    
     form_excluded_columns = [ServiceQuickStep.id]
     
     form_overrides = dict(step_desc=TextAreaField, checklist=LineSeparatedListField)
+    
+    column_labels = {
+        ServiceQuickStep.service_page: "Parent Service Page",
+        ServiceQuickStep.step_label: "Step Number / Label",
+        ServiceQuickStep.step_title: "Step Title",
+        ServiceQuickStep.step_desc: "Step Description",
+        ServiceQuickStep.checklist: "Checklist Items",
+        ServiceQuickStep.step_order: "Order Sequence"
+    }
+
     form_args = {
-        "step_label": dict(description="Only for 'Steps' layout (e.g. '1.')"),
-        "checklist": dict(description="Only for 'Standards' layout. One item per line.", render_kw={"rows": 6})
+        "step_label": dict(description="Only for 'Steps' layout (e.g. '1.')", render_kw={"style": "width: 100%;"}),
+        "step_title": dict(render_kw={"style": "width: 100%;"}),
+        "step_desc": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "checklist": dict(description="Only for 'Standards' layout. One item per line.", render_kw={"rows": 6, "style": "width: 100%;"}),
+        "step_order": dict(render_kw={"style": "width: 100%;"})
     }
     
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
@@ -853,12 +906,33 @@ class ServiceOfferingAdmin(ModelView, model=ServiceOffering):
     icon = "fa-solid fa-box-open"
     
     column_list = [ServiceOffering.service_page, ServiceOffering.title, ServiceOffering.display_order]
+    column_searchable_list = ["service_page.page_name", ServiceOffering.title, ServiceOffering.description]
+    
     form_excluded_columns = [ServiceOffering.id]
     
     form_overrides = dict(description=TextAreaField, checklist=LineSeparatedListField)
+    
+    column_labels = {
+        ServiceOffering.service_page: "Parent Service Page",
+        ServiceOffering.title: "Package Title",
+        ServiceOffering.description: "Description",
+        ServiceOffering.checklist: "Included Features List",
+        ServiceOffering.icon_image: "Icon URL",
+        ServiceOffering.highlight_badge: "Badge Text",
+        ServiceOffering.button_text: "Button Label",
+        ServiceOffering.button_url: "Button Link",
+        ServiceOffering.display_order: "Display Order"
+    }
+
     form_args = {
-        "checklist": dict(render_kw={"rows": 6, "placeholder": "Feature 1\nFeature 2"}),
-        "highlight_badge": dict(label="Badge Text (e.g. 'POPULAR')")
+        "title": dict(render_kw={"style": "width: 100%;"}),
+        "description": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "checklist": dict(render_kw={"rows": 6, "style": "width: 100%;", "placeholder": "Feature 1\nFeature 2"}),
+        "highlight_badge": dict(label="Badge Text (e.g. 'POPULAR')", render_kw={"style": "width: 100%;"}),
+        "icon_image": dict(render_kw={"style": "width: 100%;"}),
+        "button_text": dict(render_kw={"style": "width: 100%;"}),
+        "button_url": dict(render_kw={"style": "width: 100%;"}),
+        "display_order": dict(render_kw={"style": "width: 100%;"})
     }
     
     column_formatters = { ServiceOffering.icon_image: format_image_preview }
@@ -870,12 +944,26 @@ class ServiceMethodologyAdmin(ModelView, model=ServiceMethodology):
     icon = "fa-solid fa-timeline"
     
     column_list = [ServiceMethodology.service_page, ServiceMethodology.phase_title, ServiceMethodology.phase_order]
+    column_searchable_list = ["service_page.page_name", ServiceMethodology.phase_title, ServiceMethodology.phase_desc]
+    
     form_excluded_columns = [ServiceMethodology.id]
     form_overrides = dict(phase_desc=TextAreaField)
     
+    column_labels = {
+        ServiceMethodology.service_page: "Parent Service Page",
+        ServiceMethodology.phase_number: "Phase Number",
+        ServiceMethodology.phase_title: "Phase Title",
+        ServiceMethodology.phase_desc: "Phase Description",
+        ServiceMethodology.icon_image: "Icon URL",
+        ServiceMethodology.phase_order: "Phase Order"
+    }
+
     form_args = {
-        "phase_number": dict(description="Only for 'Timeline' layout (e.g. '01')"),
-        "icon_image": dict(description="Only for 'Roles Grid' layout")
+        "phase_number": dict(description="Only for 'Timeline' layout (e.g. '01')", render_kw={"style": "width: 100%;"}),
+        "phase_title": dict(render_kw={"style": "width: 100%;"}),
+        "phase_desc": dict(render_kw={"rows": 4, "style": "width: 100%;"}),
+        "icon_image": dict(description="Only for 'Roles Grid' layout", render_kw={"style": "width: 100%;"}),
+        "phase_order": dict(render_kw={"style": "width: 100%;"})
     }
     
     column_formatters = { ServiceMethodology.icon_image: format_image_preview }
@@ -887,8 +975,23 @@ class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
     icon = "fa-solid fa-chart-bar"
     
     column_list = [ServiceCompetency.service_page, ServiceCompetency.skill_name, ServiceCompetency.percentage_value, ServiceCompetency.rank_order]
+    column_searchable_list = ["service_page.page_name", ServiceCompetency.skill_name]
+    
     form_excluded_columns = [ServiceCompetency.id]
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
+    column_labels = {
+        ServiceCompetency.service_page: "Parent Service Page",
+        ServiceCompetency.skill_name: "Skill Name",
+        ServiceCompetency.percentage_value: "Proficiency (%)",
+        ServiceCompetency.rank_order: "Display Order"
+    }
+    
+    form_args = {
+        "skill_name": dict(render_kw={"style": "width: 100%;"}),
+        "percentage_value": dict(render_kw={"style": "width: 100%;"}),
+        "rank_order": dict(render_kw={"style": "width: 100%;"})
+    }
 
 def setup_admin(app, engine):
     admin = Admin(

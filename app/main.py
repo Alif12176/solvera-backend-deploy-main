@@ -75,17 +75,11 @@ app.add_middleware(
     allow_origin_regex=r"https://corporate-website-solvera.*\.vercel\.app"
 )
 
-# --- REORDERED ROUTERS BELOW ---
-# Service router must be included BEFORE Solution router to prevent 
-# the solution's /{slug} endpoint from hijacking /services
-
 app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
 app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"])
 app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
 app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"]) # Moved Up
 app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) # Moved Down
-
-# -------------------------------
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
