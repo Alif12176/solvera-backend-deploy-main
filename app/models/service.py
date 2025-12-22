@@ -60,6 +60,9 @@ class ServiceFocusItem(Base):
     display_order = Column(Integer, default=0, index=True)
     service_page = relationship("ServicePage", back_populates="focus_items")
 
+    def __str__(self):
+        return self.card_title
+
 class ServiceQuickStep(Base):
     __tablename__ = "service_quick_steps"
 
@@ -75,6 +78,9 @@ class ServiceQuickStep(Base):
     step_order = Column(Integer, default=0, index=True)
     
     service_page = relationship("ServicePage", back_populates="quick_steps")
+
+    def __str__(self):
+        return self.step_title
 
 class ServiceMethodology(Base):
     __tablename__ = "service_methodologies"
@@ -92,6 +98,9 @@ class ServiceMethodology(Base):
     
     service_page = relationship("ServicePage", back_populates="methodologies")
 
+    def __str__(self):
+        return self.phase_title
+
 class ServiceCompetency(Base):
     __tablename__ = "service_competencies"
 
@@ -104,6 +113,9 @@ class ServiceCompetency(Base):
     rank_order = Column(Integer, default=0, index=True)
     
     service_page = relationship("ServicePage", back_populates="competencies")
+
+    def __str__(self):
+        return self.skill_name
 
 class ServiceOffering(Base):
     __tablename__ = "service_offerings"
@@ -125,3 +137,6 @@ class ServiceOffering(Base):
     display_order = Column(Integer, default=0, index=True)
     
     service_page = relationship("ServicePage", back_populates="offerings")
+
+    def __str__(self):
+        return self.title

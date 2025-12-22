@@ -1022,6 +1022,15 @@ class ServicePageAdmin(ModelView, model=ServicePage):
         ServicePage.hero_bg_image: format_image_preview
     }
 
+    column_formatters_detail = {
+        "hero_bg_image": format_image_preview,
+        "focus_items": lambda m, a: [i.card_title for i in m.focus_items] if m.focus_items else [],
+        "quick_steps": lambda m, a: [i.step_title for i in m.quick_steps] if m.quick_steps else [],
+        "offerings": lambda m, a: [i.title for i in m.offerings] if m.offerings else [],
+        "methodologies": lambda m, a: [i.phase_title for i in m.methodologies] if m.methodologies else [],
+        "competencies": lambda m, a: [f"{i.skill_name} ({i.percentage_value}%)" for i in m.competencies] if m.competencies else [],
+    }
+
     def is_accessible(self, request: Request) -> bool:
         return request.session.get("role") == "admin"
 
