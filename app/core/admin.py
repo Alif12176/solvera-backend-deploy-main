@@ -1,8 +1,8 @@
 from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
-from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField, HiddenField
-from wtforms.widgets import TextArea
+from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField, HiddenField, IntegerField
+from wtforms.widgets import TextArea, Input
 from wtforms.validators import Optional, DataRequired, ValidationError
 from markupsafe import Markup
 import re
@@ -19,6 +19,50 @@ from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, Solut
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
 from app.models.service import ServicePage, ServiceFocusItem, ServiceQuickStep, ServiceOffering, ServiceMethodology, ServiceCompetency
+
+class RangeSliderWidget(Input):
+    input_type = "range"
+
+    def __call__(self, field, **kwargs):
+        kwargs.setdefault("id", field.id)
+        kwargs.setdefault("type", self.input_type)
+        kwargs.setdefault("min", "0")
+        kwargs.setdefault("max", "100")
+        kwargs.setdefault("step", "1")
+        
+        range_input = super().__call__(field, **kwargs)
+        
+        number_id = f"{field.id}_number"
+        number_val = field.data if field.data is not None else 0
+        
+        number_input = f"""
+        <input type="number" id="{number_id}" 
+               value="{number_val}" 
+               min="0" max="100" 
+               style="width: 80px; margin-left: 10px; padding: 5px; border: 1px solid #ccc; border-radius: 4px;" 
+               class="form-control">
+        """
+        
+        script = f"""
+        <script>
+            (function() {{
+                var range = document.getElementById('{field.id}');
+                var number = document.getElementById('{number_id}');
+                
+                if(range && number) {{
+                    range.addEventListener('input', function() {{
+                        number.value = range.value;
+                    }});
+                    
+                    number.addEventListener('input', function() {{
+                        range.value = number.value;
+                    }});
+                }}
+            }})();
+        </script>
+        """
+        
+        return Markup(f'<div style="display: flex; align-items: center; width: 100%;">{range_input}{number_input}</div>{script}')
 
 def unique_article_title_validator(form, field):
     db = SessionLocal()
@@ -375,22 +419,6 @@ class ArticleAdmin(ModelView, model=Article):
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
-            new_title = data.get("title")
-            if new_title:
-                if not is_created:
-                    original_article = db.query(Article).filter(Article.id == model.id).first()
-                    if original_article and original_article.title != new_title:
-                        duplicate = db.query(Article).filter(
-                            Article.title == new_title,
-                            Article.id != model.id
-                        ).first()
-                        if duplicate:
-                            raise ValidationError(f"An article with the title '{new_title}' already exists.")
-                else:
-                    duplicate = db.query(Article).filter(Article.title == new_title).first()
-                    if duplicate:
-                        raise ValidationError(f"An article with the title '{new_title}' already exists.")
-            
             if not is_created and model.slug:
                 if "slug" in data:
                     del data["slug"]
@@ -407,11 +435,11 @@ class ArticleAdmin(ModelView, model=Article):
                 if not is_created:
                     existing_article = db.query(Article).get(model.id)
                     if existing_article.publisher and str(existing_article.publisher.user_id) != user_id:
-                        raise ValidationError("You do not have permission to edit articles created by other authors.")
+                        raise ValueError("You do not have permission to edit articles created by other authors.")
 
                 author = db.query(Author).filter(Author.user_id == user_id).first()
                 if not author:
-                    raise ValidationError("You must have an Author Profile linked to your User to post.")
+                    raise ValueError("You must have an Author Profile linked to your User to post.")
                 model.publisher_id = author.id
                 if "publisher" in data:
                     del data["publisher"]
@@ -419,44 +447,22 @@ class ArticleAdmin(ModelView, model=Article):
         finally:
             db.close()
 
+    async def after_model_change(self, data, model, is_created, request):
+        """Called after successful model change"""
+        pass
+
+    def on_model_change_error(self, request, form, error):
+        """Handle errors during model change - but don't try to fix form state"""
+        # Just let sqladmin handle it naturally
+        pass
+
     async def on_model_delete(self, model, request):
         role = request.session.get("role")
         user_id = request.session.get("user_id")
         
         if role != "admin":
             if model.publisher and str(model.publisher.user_id) != user_id:
-                raise ValidationError("You cannot delete articles created by other authors.")
-
-    def on_model_change_error(self, request, form, error):
-        db = SessionLocal()
-        try:
-            if hasattr(form, 'publisher') and form.publisher.data:
-                val = form.publisher.data
-                if isinstance(val, (int, str)):
-                    if isinstance(val, str) and val.isdigit():
-                        val = int(val)
-                    if isinstance(val, int):
-                        author = db.query(Author).get(val)
-                        if author:
-                            form.publisher.data = author
-
-            if hasattr(form, 'categories') and form.categories.data:
-                new_cats = []
-                for val in form.categories.data:
-                    if isinstance(val, (int, str)):
-                        if isinstance(val, str) and val.isdigit():
-                            val = int(val)
-                        if isinstance(val, int):
-                            cat = db.query(Category).get(val)
-                            if cat:
-                                new_cats.append(cat)
-                        else:
-                            new_cats.append(val)
-                    else:
-                        new_cats.append(val)
-                form.categories.data = new_cats
-        finally:
-            db.close()  
+                raise ValueError("You cannot delete articles created by other authors.")
 
 class AuthorAdmin(ModelView, model=Author):
     category = "Blog Manager"
@@ -1199,9 +1205,13 @@ class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
         ServiceCompetency.rank_order: "Display Order"
     }
     
+    form_overrides = dict(
+        percentage_value=IntegerField
+    )
+    
     form_args = {
         "skill_name": dict(render_kw={"style": "width: 100%;"}),
-        "percentage_value": dict(render_kw={"style": "width: 100%;"}),
+        "percentage_value": dict(widget=RangeSliderWidget(), render_kw={"style": "flex-grow: 1; cursor: pointer;"}),
         "rank_order": dict(render_kw={"style": "width: 100%;"})
     }
 
