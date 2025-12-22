@@ -21,17 +21,27 @@ from app.models.social_trust import SocialTrust
 from app.models.service import ServicePage, ServiceFocusItem, ServiceQuickStep, ServiceOffering, ServiceMethodology, ServiceCompetency
 
 def unique_article_title_validator(form, field):
-    if field.object_data == field.data:
-        return
-
     db = SessionLocal()
     try:
-        existing = db.query(Article).filter(Article.title == field.data).first()
+        if hasattr(form, 'id') and form.id.data:
+            original_article = db.query(Article).filter(Article.id == form.id.data).first()
+            if original_article and original_article.title == field.data:
+                return
+        
+        query = db.query(Article).filter(Article.title == field.data)
+        
+        if hasattr(form, 'id') and form.id.data:
+            query = query.filter(Article.id != form.id.data)
+            
+        existing = query.first()
         
         if existing:
             if hasattr(form, 'publisher') and form.publisher.data:
-                if isinstance(form.publisher.data, str) and form.publisher.data.isdigit():
-                    author_obj = db.query(Author).get(int(form.publisher.data))
+                val = form.publisher.data
+                if isinstance(val, str) and val.isdigit():
+                    val = int(val)
+                if isinstance(val, int):
+                    author_obj = db.query(Author).get(val)
                     if author_obj:
                         form.publisher.data = author_obj
 
@@ -40,6 +50,10 @@ def unique_article_title_validator(form, field):
                 for item in form.categories.data:
                     if isinstance(item, str) and item.isdigit():
                         cat_obj = db.query(Category).get(int(item))
+                        if cat_obj:
+                            new_data.append(cat_obj)
+                    elif isinstance(item, int):
+                        cat_obj = db.query(Category).get(item)
                         if cat_obj:
                             new_data.append(cat_obj)
                     else:
@@ -328,7 +342,7 @@ class ArticleAdmin(ModelView, model=Article):
 
     form_args = {
         "summary": dict(label="Short Summary"),
-        "title": dict(validators=[DataRequired(), unique_article_title_validator]),
+        "title": dict(validators=[DataRequired()]),
         "slug": dict(
             label="URL Slug (Auto-generated)", 
             render_kw={"disabled": "disabled"},
@@ -352,19 +366,31 @@ class ArticleAdmin(ModelView, model=Article):
         Article.content: format_long_text
     }
 
-    def get_query(self, request: Request):
-        query = super().get_query(request)
-        role = request.session.get("role")
-        user_id = request.session.get("user_id")
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
 
-        if role != "admin" and user_id:
-            query = query.join(Article.publisher).join(Author.user).filter(User.id == user_id)
-        
-        return query
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
 
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
+            new_title = data.get("title")
+            if new_title:
+                if not is_created:
+                    original_article = db.query(Article).filter(Article.id == model.id).first()
+                    if original_article and original_article.title != new_title:
+                        duplicate = db.query(Article).filter(
+                            Article.title == new_title,
+                            Article.id != model.id
+                        ).first()
+                        if duplicate:
+                            raise ValidationError(f"An article with the title '{new_title}' already exists.")
+                else:
+                    duplicate = db.query(Article).filter(Article.title == new_title).first()
+                    if duplicate:
+                        raise ValidationError(f"An article with the title '{new_title}' already exists.")
+            
             if not is_created and model.slug:
                 if "slug" in data:
                     del data["slug"]
@@ -376,15 +402,30 @@ class ArticleAdmin(ModelView, model=Article):
 
             role = request.session.get("role")
             user_id = request.session.get("user_id")
+            
+            if role != "admin":
+                if not is_created:
+                    existing_article = db.query(Article).get(model.id)
+                    if existing_article.publisher and str(existing_article.publisher.user_id) != user_id:
+                        raise ValidationError("You do not have permission to edit articles created by other authors.")
 
-            if role != "admin" and is_created:
                 author = db.query(Author).filter(Author.user_id == user_id).first()
-                if author:
-                    data["publisher_id"] = author.id
-                else:
+                if not author:
                     raise ValidationError("You must have an Author Profile linked to your User to post.")
+                model.publisher_id = author.id
+                if "publisher" in data:
+                    del data["publisher"]
+            
         finally:
             db.close()
+
+    async def on_model_delete(self, model, request):
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+        
+        if role != "admin":
+            if model.publisher and str(model.publisher.user_id) != user_id:
+                raise ValidationError("You cannot delete articles created by other authors.")
 
     def on_model_change_error(self, request, form, error):
         db = SessionLocal()
@@ -430,6 +471,69 @@ class AuthorAdmin(ModelView, model=Author):
         "user": { "fields": ["username"], "order_by": "username", "placeholder": "Link to Login User..." }
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
+
+    async def edit(self, request: Request):
+        if request.session.get("role") == "editor":
+            if "user" not in self.form_excluded_columns:
+                self.form_excluded_columns = list(self.form_excluded_columns) + [Author.user]
+        return await super().edit(request)
+    
+    async def create(self, request: Request):
+        if request.session.get("role") == "editor":
+            if "user" not in self.form_excluded_columns:
+                self.form_excluded_columns = list(self.form_excluded_columns) + [Author.user]
+        return await super().create(request)
+
+    async def on_model_change(self, data, model, is_created, request):
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+
+        db = SessionLocal()
+        try:
+            target_user_id = None
+
+            if role != "admin":
+                if not is_created:
+                    existing_author = db.query(Author).get(model.id)
+                    if existing_author and str(existing_author.user_id) != user_id:
+                        raise ValidationError("You cannot edit other authors' profiles.")
+
+                model.user_id = user_id
+                
+                if "user" in data:
+                    del data["user"]
+                
+                target_user_id = user_id
+            
+            else:
+                if "user" in data:
+                    val = data["user"]
+                    target_user_id = val.id if hasattr(val, 'id') else val
+
+            if target_user_id:
+                query = db.query(Author).filter(Author.user_id == target_user_id)
+                
+                if model.id:
+                    query = query.filter(Author.id != model.id)
+                
+                if query.first():
+                     raise ValidationError("This user is already linked to another Author profile.")
+        finally:
+            db.close()
+
+    async def on_model_delete(self, model, request):
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+        
+        if role != "admin":
+            if model.user_id and str(model.user_id) != user_id:
+                raise ValidationError("You cannot delete other authors' profiles.")
+
 class CategoryAdmin(ModelView, model=Category):
     category = "Blog Manager"
     name = "Category"
@@ -438,6 +542,12 @@ class CategoryAdmin(ModelView, model=Category):
     column_list = [Category.name]
     column_searchable_list = [Category.name]
     form_excluded_columns = [Category.created_at, Category.updated_at]
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") in ["admin", "editor"]
 
 class ProductAdmin(ModelView, model=Product):
     category = "Product Manager"
@@ -482,6 +592,12 @@ class ProductAdmin(ModelView, model=Product):
         Product.hero_image: format_image_preview
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
@@ -524,6 +640,12 @@ class ProductFeatureAdmin(ModelView, model=ProductFeature):
         "benefits": dict(label="Benefits List", description="Type one benefit per line.", render_kw={"rows": 8, "style": "width: 100%;", "placeholder": "Fast Processing\nSecure Data"})
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
     category = "Product Manager"
     name = "Why Us Item"
@@ -536,6 +658,12 @@ class ProductWhyUsAdmin(ModelView, model=ProductWhyUs):
 
     form_excluded_columns = [ProductWhyUs.id, ProductWhyUs.created_at, ProductWhyUs.updated_at]
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 class SocialTrustAdmin(ModelView, model=SocialTrust):
     category = "Partners"
@@ -557,6 +685,12 @@ class SocialTrustAdmin(ModelView, model=SocialTrust):
     
     form_excluded_columns = [SocialTrust.id, SocialTrust.created_at, SocialTrust.updated_at]
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ProductSocialTrustLinkAdmin(ModelView, model=ProductSocialTrustLink):
     category = "Product Manager"
     name = "Product Partner"
@@ -577,6 +711,12 @@ class ProductSocialTrustLinkAdmin(ModelView, model=ProductSocialTrustLink):
         "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner..." }
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ProductFAQAdmin(ModelView, model=ProductFAQ):
     category = "Product Manager"
     name = "Product FAQ"
@@ -591,6 +731,12 @@ class ProductFAQAdmin(ModelView, model=ProductFAQ):
     form_ajax_refs = { "product": { "fields": ["name"], "order_by": "name", "placeholder": "Search for a Product..." } }
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 class SolutionAdmin(ModelView, model=Solution):
     category = "Solution Manager"
@@ -648,6 +794,12 @@ class SolutionAdmin(ModelView, model=Solution):
         Solution.cta_image: format_image_preview
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
     async def on_model_change(self, data, model, is_created, request):
         db = SessionLocal()
         try:
@@ -688,6 +840,12 @@ class SolutionFeatureAdmin(ModelView, model=SolutionFeature):
         "benefits": dict(label="Benefits List", description="Type one benefit per line.", render_kw={"rows": 8, "style": "width: 100%;", "placeholder": "Benefit A\nBenefit B"})
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class SolutionWhyUsAdmin(ModelView, model=SolutionWhyUs):
     category = "Solution Manager"
     name = "Why Us Item"
@@ -702,6 +860,12 @@ class SolutionWhyUsAdmin(ModelView, model=SolutionWhyUs):
     form_ajax_refs = { "solution": { "fields": ["name"], "order_by": "name", "placeholder": "Select Solution..." } }
     form_overrides = dict(description=TextAreaField)
     form_args = { "description": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
     category = "Solution Manager"
@@ -731,6 +895,12 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
         "product": { "fields": ["name"], "order_by": "name", "placeholder": "Link to which Product?" }
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class SolutionSocialTrustLinkAdmin(ModelView, model=SolutionSocialTrustLink):
     category = "Solution Manager"
     name = "Solution Partner"
@@ -751,6 +921,12 @@ class SolutionSocialTrustLinkAdmin(ModelView, model=SolutionSocialTrustLink):
         "partner": { "fields": ["name"], "order_by": "name", "placeholder": "Select Partner..." }
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     category = "Solution Manager"
     name = "Solution FAQ"
@@ -765,6 +941,12 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     form_ajax_refs = { "solution": { "fields": ["name"], "order_by": "name", "placeholder": "Select Solution..." } }
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 class ServicePageAdmin(ModelView, model=ServicePage):
     category = "Service Manager"
@@ -834,6 +1016,12 @@ class ServicePageAdmin(ModelView, model=ServicePage):
         ServicePage.hero_bg_image: format_image_preview
     }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
     async def on_model_change(self, data, model, is_created, request):
         if data.get("page_name") and not data.get("slug"):
              db = SessionLocal()
@@ -869,6 +1057,12 @@ class ServiceFocusItemAdmin(ModelView, model=ServiceFocusItem):
     
     column_formatters = { ServiceFocusItem.icon_image: format_image_preview }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ServiceQuickStepAdmin(ModelView, model=ServiceQuickStep):
     category = "Service Manager"
     name = "Quick Step / Standard"
@@ -899,6 +1093,12 @@ class ServiceQuickStepAdmin(ModelView, model=ServiceQuickStep):
     }
     
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 class ServiceOfferingAdmin(ModelView, model=ServiceOffering):
     category = "Service Manager"
@@ -938,6 +1138,12 @@ class ServiceOfferingAdmin(ModelView, model=ServiceOffering):
     column_formatters = { ServiceOffering.icon_image: format_image_preview }
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ServiceMethodologyAdmin(ModelView, model=ServiceMethodology):
     category = "Service Manager"
     name = "Methodology / Role"
@@ -969,6 +1175,12 @@ class ServiceMethodologyAdmin(ModelView, model=ServiceMethodology):
     column_formatters = { ServiceMethodology.icon_image: format_image_preview }
     form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
 
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
     category = "Service Manager"
     name = "Skill / Competency"
@@ -992,6 +1204,12 @@ class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
         "percentage_value": dict(render_kw={"style": "width: 100%;"}),
         "rank_order": dict(render_kw={"style": "width: 100%;"})
     }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
 
 def setup_admin(app, engine):
     admin = Admin(
