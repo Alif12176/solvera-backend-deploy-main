@@ -8,6 +8,7 @@ def get_service_by_slug(db: Session, slug: str):
     service = db.query(ServicePage).options(
         joinedload(ServicePage.focus_items),
         joinedload(ServicePage.quick_steps),
+        joinedload(ServicePage.offerings),
         joinedload(ServicePage.methodologies),
         joinedload(ServicePage.competencies)
     ).filter(ServicePage.slug == slug).first()

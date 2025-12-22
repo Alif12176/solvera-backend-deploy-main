@@ -1,5 +1,5 @@
 from uuid import uuid4
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy import Column, String, Text, ForeignKey, DateTime, func, Integer
 from sqlalchemy.orm import relationship
 from app.db.base import Base
@@ -15,12 +15,24 @@ class ServicePage(Base):
     hero_tagline = Column(Text, nullable=True)
     hero_bg_image = Column(String, nullable=True)
 
+    focus_section_tagline = Column(Text, nullable=True)
     focus_section_heading = Column(Text, nullable=True)
     focus_section_desc = Column(Text, nullable=True)
+
+    quick_step_layout = Column(String, default='steps', nullable=False)
     quick_step_heading = Column(Text, nullable=True)
     quick_step_subheading = Column(Text, nullable=True)
+    quick_step_footer = Column(Text, nullable=True)
+
+    offering_heading = Column(Text, nullable=True)
+    offering_desc = Column(Text, nullable=True)
+
+    methodology_layout = Column(String, default='timeline', nullable=False)
+    methodology_footer = Column(Text, nullable=True)
     methodology_heading = Column(Text, nullable=True)
     methodology_desc = Column(Text, nullable=True)
+
+    competency_footer = Column(Text, nullable=True)
     competency_heading = Column(Text, nullable=True)
     competency_desc = Column(Text, nullable=True)
 
@@ -29,6 +41,9 @@ class ServicePage(Base):
 
     focus_items = relationship("ServiceFocusItem", back_populates="service_page", order_by="ServiceFocusItem.display_order", cascade="all, delete-orphan")
     quick_steps = relationship("ServiceQuickStep", back_populates="service_page", order_by="ServiceQuickStep.step_order", cascade="all, delete-orphan")
+    
+    offerings = relationship("ServiceOffering", back_populates="service_page", order_by="ServiceOffering.display_order", cascade="all, delete-orphan")
+    
     methodologies = relationship("ServiceMethodology", back_populates="service_page", order_by="ServiceMethodology.phase_order", cascade="all, delete-orphan")
     competencies = relationship("ServiceCompetency", back_populates="service_page", order_by="ServiceCompetency.rank_order", cascade="all, delete-orphan")
 
@@ -37,16 +52,12 @@ class ServicePage(Base):
 
 class ServiceFocusItem(Base):
     __tablename__ = "service_focus_items"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
-    
     card_title = Column(Text, nullable=False)
     card_desc = Column(Text, nullable=True)
     icon_image = Column(String, nullable=True)
-    
     display_order = Column(Integer, default=0, index=True)
-    
     service_page = relationship("ServicePage", back_populates="focus_items")
 
 class ServiceQuickStep(Base):
@@ -55,9 +66,11 @@ class ServiceQuickStep(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
     service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
     
-    step_label = Column(String, nullable=True)
+    step_label = Column(String, nullable=True) 
     step_title = Column(Text, nullable=False)
     step_desc = Column(Text, nullable=True)
+    
+    checklist = Column(JSON, nullable=True) 
     
     step_order = Column(Integer, default=0, index=True)
     
@@ -72,6 +85,8 @@ class ServiceMethodology(Base):
     phase_number = Column(String, nullable=True)
     phase_title = Column(Text, nullable=False)
     phase_desc = Column(Text, nullable=True)
+    
+    icon_image = Column(String, nullable=True) 
     
     phase_order = Column(Integer, default=0, index=True)
     
@@ -89,3 +104,24 @@ class ServiceCompetency(Base):
     rank_order = Column(Integer, default=0, index=True)
     
     service_page = relationship("ServicePage", back_populates="competencies")
+
+class ServiceOffering(Base):
+    __tablename__ = "service_offerings"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4, index=True)
+    service_page_id = Column(UUID(as_uuid=True), ForeignKey("service_pages.id"))
+    
+    title = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    checklist = Column(JSON, nullable=True) 
+    
+    icon_image = Column(String, nullable=True)
+    highlight_badge = Column(String, nullable=True)
+    
+    button_text = Column(String, nullable=True)
+    button_url = Column(String, nullable=True)
+    
+    display_order = Column(Integer, default=0, index=True)
+    
+    service_page = relationship("ServicePage", back_populates="offerings")

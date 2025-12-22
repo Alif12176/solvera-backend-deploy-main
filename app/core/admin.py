@@ -18,6 +18,7 @@ from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ, SolutionSocialTrustLink
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
+from app.models.service import ServicePage, ServiceFocusItem, ServiceQuickStep, ServiceOffering, ServiceMethodology, ServiceCompetency
 
 def unique_article_title_validator(form, field):
     if field.object_data == field.data:
@@ -443,11 +444,17 @@ class ProductAdmin(ModelView, model=Product):
     name = "Product Page"
     name_plural = "Products"
     icon = "fa-solid fa-box-open"
+    
     column_list = [Product.name, Product.slug, Product.category, Product.updated_at]
+    
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
     form_excluded_columns = [Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.trusted_by]
-    
-    form_overrides = dict(hero_subtitle=TextAreaField, id=HiddenField)
+    form_overrides = dict(
+        hero_subtitle=TextAreaField, 
+        id=HiddenField,
+        layout=SelectField,     
+        layout_type=SelectField 
+    )
     
     form_args = { 
         "name": dict(validators=[DataRequired()]),
@@ -455,6 +462,16 @@ class ProductAdmin(ModelView, model=Product):
         "slug": dict(
             label="URL Slug (Auto-generated)", 
             render_kw={"disabled": "disabled"},
+            validators=[Optional()]
+        ),
+        "layout": dict(
+            choices=[("default"), ("feature_list")],
+            label="Layout Type",
+            validators=[Optional()]
+        ),
+        "layout_type": dict(
+            choices=[("default"), ("feature_list")],
+            label="Layout Type",
             validators=[Optional()]
         )
     }
@@ -749,6 +766,130 @@ class SolutionFAQAdmin(ModelView, model=SolutionFAQ):
     form_overrides = dict(answer=TextAreaField)
     form_args = { "answer": dict(render_kw={"rows": 6, "style": "width: 100%;"}) }
 
+class ServicePageAdmin(ModelView, model=ServicePage):
+    category = "Service Manager"
+    name = "Service Landing Page"
+    icon = "fa-solid fa-layer-group"
+    
+    column_list = [ServicePage.page_name, ServicePage.slug, ServicePage.updated_at]
+    form_excluded_columns = [
+        ServicePage.id, ServicePage.created_at, ServicePage.updated_at,
+        ServicePage.focus_items, ServicePage.quick_steps, 
+        ServicePage.offerings, ServicePage.methodologies, ServicePage.competencies
+    ]
+    
+    form_overrides = dict(
+        hero_tagline=TextAreaField,
+        focus_section_desc=TextAreaField,
+        quick_step_subheading=TextAreaField,
+        quick_step_footer=TextAreaField,
+        offering_desc=TextAreaField,
+        methodology_desc=TextAreaField,
+        methodology_footer=TextAreaField,
+        competency_desc=TextAreaField,
+        competency_footer=TextAreaField,
+        
+        # Dropdowns for layout selection
+        quick_step_layout=SelectField,
+        methodology_layout=SelectField
+    )
+    
+    form_args = {
+        "slug": dict(label="URL Slug (Auto-generated)", render_kw={"disabled": "disabled"}, validators=[Optional()]),
+        "page_name": dict(label="Internal Page Name (e.g. Konsultasi)"),
+        
+        "quick_step_layout": dict(
+            choices=[("steps", "Horizontal Steps (1,2,3)"), ("standards_grid", "Standards Grid (Checklists)")],
+            label="Quick Step Layout"
+        ),
+        "methodology_layout": dict(
+            choices=[("timeline", "Vertical Timeline (01, 02)"), ("roles_grid", "Icon Grid (Roles)")],
+            label="Methodology Layout"
+        )
+    }
+    
+    column_formatters = {
+        ServicePage.hero_bg_image: format_image_preview
+    }
+
+    async def on_model_change(self, data, model, is_created, request):
+        if data.get("page_name") and not data.get("slug"):
+             db = SessionLocal()
+             data["slug"] = generate_unique_slug(db, ServicePage, data["page_name"], model.id if not is_created else None)
+             db.close()
+
+class ServiceFocusItemAdmin(ModelView, model=ServiceFocusItem):
+    category = "Service Manager"
+    name = "Focus Grid Item"
+    icon = "fa-solid fa-border-all"
+    
+    column_list = [ServiceFocusItem.service_page, ServiceFocusItem.card_title, ServiceFocusItem.display_order]
+    form_excluded_columns = [ServiceFocusItem.id]
+    form_overrides = dict(card_desc=TextAreaField)
+    form_args = { "card_desc": dict(render_kw={"rows": 4}) }
+    form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+    
+    column_formatters = { ServiceFocusItem.icon_image: format_image_preview }
+
+class ServiceQuickStepAdmin(ModelView, model=ServiceQuickStep):
+    category = "Service Manager"
+    name = "Quick Step / Standard"
+    icon = "fa-solid fa-forward"
+    
+    column_list = [ServiceQuickStep.service_page, ServiceQuickStep.step_title, ServiceQuickStep.step_order]
+    form_excluded_columns = [ServiceQuickStep.id]
+    
+    form_overrides = dict(step_desc=TextAreaField, checklist=LineSeparatedListField)
+    form_args = {
+        "step_label": dict(description="Only for 'Steps' layout (e.g. '1.')"),
+        "checklist": dict(description="Only for 'Standards' layout. One item per line.", render_kw={"rows": 6})
+    }
+    
+    form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
+class ServiceOfferingAdmin(ModelView, model=ServiceOffering):
+    category = "Service Manager"
+    name = "Offering Package"
+    icon = "fa-solid fa-box-open"
+    
+    column_list = [ServiceOffering.service_page, ServiceOffering.title, ServiceOffering.display_order]
+    form_excluded_columns = [ServiceOffering.id]
+    
+    form_overrides = dict(description=TextAreaField, checklist=LineSeparatedListField)
+    form_args = {
+        "checklist": dict(render_kw={"rows": 6, "placeholder": "Feature 1\nFeature 2"}),
+        "highlight_badge": dict(label="Badge Text (e.g. 'POPULAR')")
+    }
+    
+    column_formatters = { ServiceOffering.icon_image: format_image_preview }
+    form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
+class ServiceMethodologyAdmin(ModelView, model=ServiceMethodology):
+    category = "Service Manager"
+    name = "Methodology / Role"
+    icon = "fa-solid fa-timeline"
+    
+    column_list = [ServiceMethodology.service_page, ServiceMethodology.phase_title, ServiceMethodology.phase_order]
+    form_excluded_columns = [ServiceMethodology.id]
+    form_overrides = dict(phase_desc=TextAreaField)
+    
+    form_args = {
+        "phase_number": dict(description="Only for 'Timeline' layout (e.g. '01')"),
+        "icon_image": dict(description="Only for 'Roles Grid' layout")
+    }
+    
+    column_formatters = { ServiceMethodology.icon_image: format_image_preview }
+    form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
+class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
+    category = "Service Manager"
+    name = "Skill / Competency"
+    icon = "fa-solid fa-chart-bar"
+    
+    column_list = [ServiceCompetency.service_page, ServiceCompetency.skill_name, ServiceCompetency.percentage_value, ServiceCompetency.rank_order]
+    form_excluded_columns = [ServiceCompetency.id]
+    form_ajax_refs = { "service_page": { "fields": ["page_name"], "order_by": "page_name" } }
+
 def setup_admin(app, engine):
     admin = Admin(
         app, 
@@ -777,5 +918,12 @@ def setup_admin(app, engine):
     admin.add_view(SolutionFAQAdmin)
     admin.add_view(SolutionRelatedProductAdmin)
     admin.add_view(SolutionSocialTrustLinkAdmin)
+
+    admin.add_view(ServicePageAdmin)
+    admin.add_view(ServiceFocusItemAdmin)
+    admin.add_view(ServiceQuickStepAdmin)
+    admin.add_view(ServiceOfferingAdmin)
+    admin.add_view(ServiceMethodologyAdmin)
+    admin.add_view(ServiceCompetencyAdmin)
 
     return admin

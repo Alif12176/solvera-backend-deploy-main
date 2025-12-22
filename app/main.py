@@ -10,6 +10,7 @@ from app.routers.v1 import product as product_v1
 from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
 from app.routers.v1 import social_trust as social_trust_v1
+from app.routers.v1 import service as service_v1
 from app.db.session import engine
 from app.core.config import settings
 from app.core.admin import (
@@ -18,7 +19,8 @@ from app.core.admin import (
     ProductAdmin, ProductFeatureAdmin, ProductWhyUsAdmin, ProductFAQAdmin, ProductSocialTrustLinkAdmin,
     SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin, SolutionSocialTrustLinkAdmin,
     ArticleAdmin, AuthorAdmin, CategoryAdmin,
-    SocialTrustAdmin
+    SocialTrustAdmin,
+    ServicePageAdmin, ServiceFocusItemAdmin, ServiceQuickStepAdmin, ServiceOfferingAdmin, ServiceMethodologyAdmin, ServiceCompetencyAdmin
 )
 
 tags_metadata = [
@@ -33,6 +35,10 @@ tags_metadata = [
     {
         "name": "Blogs",
         "description": "Endpoints for retrieving news, articles, authors, and categories.",
+    },
+    {
+        "name": "Services",
+        "description": "Endpoints for fetching Service landing pages.",
     },
     {
         "name": "Solutions",
@@ -69,10 +75,17 @@ app.add_middleware(
     allow_origin_regex=r"https://corporate-website-solvera.*\.vercel\.app"
 )
 
+# --- REORDERED ROUTERS BELOW ---
+# Service router must be included BEFORE Solution router to prevent 
+# the solution's /{slug} endpoint from hijacking /services
+
 app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
 app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"])
-app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"])
 app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
+app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"]) # Moved Up
+app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) # Moved Down
+
+# -------------------------------
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
@@ -90,6 +103,13 @@ admin.add_view(SolutionWhyUsAdmin)
 admin.add_view(SolutionFAQAdmin)
 admin.add_view(SolutionRelatedProductAdmin)
 admin.add_view(SolutionSocialTrustLinkAdmin)
+
+admin.add_view(ServicePageAdmin)
+admin.add_view(ServiceFocusItemAdmin)
+admin.add_view(ServiceQuickStepAdmin)
+admin.add_view(ServiceOfferingAdmin)
+admin.add_view(ServiceMethodologyAdmin)
+admin.add_view(ServiceCompetencyAdmin)
 
 admin.add_view(ArticleAdmin)
 admin.add_view(AuthorAdmin)
