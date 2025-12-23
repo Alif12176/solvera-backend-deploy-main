@@ -11,7 +11,7 @@ from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
 from app.routers.v1 import social_trust as social_trust_v1
 from app.routers.v1 import service as service_v1
-from app.routers import cron    
+from app.routers.v1 import cron    
 from app.db.session import engine
 from app.core.config import settings
 from app.core.admin import (
