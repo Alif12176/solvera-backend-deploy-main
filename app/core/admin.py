@@ -117,7 +117,8 @@ class QuillEditorWidget(TextArea):
         textarea_html = super().__call__(field, **kwargs)
         
         editor_id = f"quill_editor_{field.id}"
-        
+        loading_spinner = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzgiIGhlaWdodD0iMzgiIHZpZXdCb3g9IjAgMCAzOCAzOCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiBzdHJva2U9IiMwMDAiPiA8ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPiA8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxIDEpIiBzdHJva2Utd2lkdGg9IjIiPiA8Y2lyY2xlIHN0cm9rZS1vcGFjaXR5PSIuNSIgY3g9IjE4IiBjeT0iMTgiIHI9IjE4Ii8+IDxwYXRoIGQ9Ik0zNiAxOGMwLTkuOTQtOC4wNi0xOC0xOC0xOCI+IDxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9InRyYW5zZm9ybSIgdHlwZT0icm90YXRlIiBmcm9tPSIwIDE4IDE4IiB0bz0iMzYwIDE4IDE4IiBkdXI9IjFzIiByZXBlYXRDb3VudD0iaW5kZWZpbml0ZSIvPiA8L3BhdGg+IDwvZz4gPC9nPiA8L3N2Zz4="
+
         quill_html = f"""
         <div style="background: white; margin-bottom: 20px;">
             <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
@@ -144,11 +145,55 @@ class QuillEditorWidget(TextArea):
                             ],
                             handlers: {{
                                 'image': function() {{
-                                    var range = this.quill.getSelection();
-                                    var value = prompt('Please enter the Image URL (e.g. https://example.com/image.jpg):');
-                                    if(value) {{
-                                        this.quill.insertEmbed(range.index, 'image', value, Quill.sources.USER);
-                                    }}
+                                    const input = document.createElement('input');
+                                    input.setAttribute('type', 'file');
+                                    input.setAttribute('accept', 'image/*');
+                                    input.click();
+
+                                    input.onchange = async () => {{
+                                        const file = input.files[0];
+                                        if (!file) return;
+
+                                        // 1. Lock the editor to prevent typing during upload
+                                        quill.disable();
+                                        
+                                        // 2. Insert Loading Spinner Image
+                                        const range = quill.getSelection(true);
+                                        // Use 'image' embed with the spinner Base64
+                                        quill.insertEmbed(range.index, 'image', '{loading_spinner}');
+                                        
+                                        const formData = new FormData();
+                                        formData.append('file', file);
+
+                                        try {{
+                                            const response = await fetch('/api/v1/upload-image', {{
+                                                method: 'POST',
+                                                body: formData
+                                            }});
+
+                                            if (!response.ok) throw new Error('Upload failed');
+
+                                            const data = await response.json();
+                                            
+                                            // 3. Delete the spinner (it takes up 1 index length)
+                                            quill.deleteText(range.index, 1);
+                                            
+                                            // 4. Insert the Real Image URL
+                                            quill.insertEmbed(range.index, 'image', data.url);
+                                            
+                                            // 5. Move cursor after the image
+                                            quill.setSelection(range.index + 1);
+
+                                        }} catch (error) {{
+                                            console.error('Error:', error);
+                                            // Remove spinner on error
+                                            quill.deleteText(range.index, 1);
+                                            alert('Failed to upload image. Please try again.');
+                                        }} finally {{
+                                            // 6. Unlock the editor
+                                            quill.enable();
+                                        }}
+                                    }};
                                 }}
                             }}
                         }}

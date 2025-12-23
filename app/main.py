@@ -11,6 +11,7 @@ from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
 from app.routers.v1 import social_trust as social_trust_v1
 from app.routers.v1 import service as service_v1
+from app.routers import cron    
 from app.db.session import engine
 from app.core.config import settings
 from app.core.admin import (
@@ -78,8 +79,9 @@ app.add_middleware(
 app.include_router(product_v1.router, prefix=settings.API_V1_PREFIX, tags=["Products"])
 app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"])
 app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
-app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"]) # Moved Up
-app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) # Moved Down
+app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"])
+app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) 
+app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
 admin.add_view(UserAdmin)
