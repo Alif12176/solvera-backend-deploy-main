@@ -132,15 +132,26 @@ class QuillEditorWidget(TextArea):
                 var quill = new Quill('#{editor_id}', {{
                     theme: 'snow',
                     modules: {{
-                        toolbar: [
-                            [{{ 'header': [1, 2, 3, false] }}],
-                            ['bold', 'italic', 'underline', 'strike'],
-                            ['blockquote', 'code-block'],
-                            [{{ 'list': 'ordered'}}, {{ 'list': 'bullet' }}],
-                            [{{ 'indent': '-1'}}, {{ 'indent': '+1' }}],
-                            ['link', 'image'],
-                            ['clean']
-                        ]
+                        toolbar: {{
+                            container: [
+                                [{{ 'header': [1, 2, 3, false] }}],
+                                ['bold', 'italic', 'underline', 'strike'],
+                                ['blockquote', 'code-block'],
+                                [{{ 'list': 'ordered'}}, {{ 'list': 'bullet' }}],
+                                [{{ 'indent': '-1'}}, {{ 'indent': '+1' }}],
+                                ['link', 'image'],
+                                ['clean']
+                            ],
+                            handlers: {{
+                                'image': function() {{
+                                    var range = this.quill.getSelection();
+                                    var value = prompt('Please enter the Image URL (e.g. https://example.com/image.jpg):');
+                                    if(value) {{
+                                        this.quill.insertEmbed(range.index, 'image', value, Quill.sources.USER);
+                                    }}
+                                }}
+                            }}
+                        }}
                     }}
                 }});
                 
