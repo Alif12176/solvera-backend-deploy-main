@@ -28,6 +28,7 @@ class CoreValue(ORMBase):
 
 class IndustryItem(ORMBase):
     id: Optional[UUID] = None
+    slug: Optional[str] = None
     name: str
     icon: Optional[str] = None
     description: Optional[str] = None

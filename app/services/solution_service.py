@@ -65,6 +65,7 @@ def _map_to_schema(solution_db: Solution) -> SolutionSchema:
         if rp.product: 
             industry_items.append(IndustryItem(
                 id=rp.product.id,
+                slug=rp.product.slug,
                 name=rp.product.name,
                 icon=rp.icon_url, 
                 description=rp.product.hero_subtitle,
