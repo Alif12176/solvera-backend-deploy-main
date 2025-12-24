@@ -265,7 +265,7 @@
         <div class="col-12 page-header fade-up">
             <h1 class="welcome-text">
                 {% if request.session.get('role') == 'admin' %}
-                Welcome, Master {{ request.session.get('username', 'User') }}
+                Welcome, {{ request.session.get('username', 'User') }}
                 {% elif request.session.get('role') == 'editor' %}
                 Welcome, Editor {{ request.session.get('username', 'User') }}
                 {% endif %}
