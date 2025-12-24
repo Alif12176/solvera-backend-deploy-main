@@ -165,18 +165,17 @@ class DynamicCTAWidget(SelectField.widget.__class__):
         
         script = f"""
         <style>
-            /* Maintain horizontal alignment for Subtitle and Features fields */
-            .mb-3:has(textarea) {{
+            .mb-3:has(textarea), .mb-3:has(#illustration_url), .mb-3:has(#image_url) {{
                 display: flex !important;
                 flex-direction: row !important;
                 align-items: flex-start !important;
             }}
-            .mb-3:has(textarea) label {{
+            .mb-3:has(textarea) label, .mb-3:has(#illustration_url) label, .mb-3:has(#image_url) label {{
                 flex: 0 0 16.666667%;
                 max-width: 16.666667%;
                 padding-top: 8px;
             }}
-            .mb-3:has(textarea) > div {{
+            .mb-3:has(textarea) > div, .mb-3:has(#illustration_url) > div, .mb-3:has(#image_url) > div {{
                 flex: 0 0 83.333333%;
                 max-width: 83.333333%;
             }}
@@ -189,17 +188,31 @@ class DynamicCTAWidget(SelectField.widget.__class__):
                     if (!ctaSelect) return;
                     
                     const featuresInput = document.getElementById('features') || document.querySelector('[name="features"]');
-                    const featuresField = featuresInput ? featuresInput.closest('.mb-3, .form-group, .col-md-10') : null;
+                    const illustrationInput = document.getElementById('illustration_url') || document.querySelector('[name="illustration_url"]');
+                    const imageInput = document.getElementById('image_url') || document.querySelector('[name="image_url"]');
                     
-                    if (featuresField && featuresInput) {{
-                        if (ctaSelect.value === 'hubungi-kami') {{
-                            featuresField.style.display = 'none';
-                            featuresInput.value = '';
-                            featuresInput.disabled = true;
-                        }} else {{
-                            featuresField.style.display = 'block';
-                            featuresInput.disabled = false;
-                        }}
+                    const featuresField = featuresInput ? featuresInput.closest('.mb-3, .form-group') : null;
+                    const illustrationField = illustrationInput ? illustrationInput.closest('.mb-3, .form-group') : null;
+                    const imageField = imageInput ? imageInput.closest('.mb-3, .form-group') : null;
+                    
+                    if (ctaSelect.value === 'hubungi-kami') {{
+                        if (featuresField) featuresField.style.display = 'none';
+                        if (featuresInput) {{ featuresInput.value = ''; featuresInput.disabled = true; }}
+                        
+                        if (illustrationField) illustrationField.style.display = 'none';
+                        if (illustrationInput) {{ illustrationInput.value = ''; illustrationInput.disabled = true; }}
+                        
+                        if (imageField) imageField.style.display = 'block';
+                        if (imageInput) imageInput.disabled = false;
+                    }} else {{
+                        if (featuresField) featuresField.style.display = 'block';
+                        if (featuresInput) featuresInput.disabled = false;
+                        
+                        if (illustrationField) illustrationField.style.display = 'block';
+                        if (illustrationInput) illustrationInput.disabled = false;
+                        
+                        if (imageField) imageField.style.display = 'none';
+                        if (imageInput) {{ imageInput.value = ''; imageInput.disabled = true; }}
                     }}
                 }}
                 
@@ -537,12 +550,8 @@ class ArticleAdmin(ModelView, model=Article):
     form_excluded_columns = [Article.created_at, Article.updated_at]
 
     def list_query(self, request):
-        """Optimize list query by deferring large text fields"""
         query = super().list_query(request)
         return query.options(
-            # Defer large text fields to save bandwidth
-            # They will still be loaded on-demand if accessed (which list view doesn't)
-            # or in detail view where they are needed
             load_only(Article.id, Article.title, Article.slug, Article.publisher_id, Article.published_at, Article.image_url)
         )
 
@@ -621,12 +630,9 @@ class ArticleAdmin(ModelView, model=Article):
             db.close()
 
     async def after_model_change(self, data, model, is_created, request):
-        """Called after successful model change"""
         pass
 
     def on_model_change_error(self, request, form, error):
-        """Handle errors during model change - but don't try to fix form state"""
-        # Just let sqladmin handle it naturally
         pass
 
     async def on_model_delete(self, model, request):
@@ -739,7 +745,6 @@ class ProductAdmin(ModelView, model=Product):
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
     form_excluded_columns = [Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.trusted_by]
     
-    # Fix Detail View Image Rendering
     column_formatters_detail = {
         Product.hero_image: format_image_preview
     }
@@ -754,7 +759,7 @@ class ProductAdmin(ModelView, model=Product):
                 Product.slug, 
                 Product.category, 
                 Product.hero_image,
-                Product.updated_at # Still needed for sorting potentially
+                Product.updated_at
              )
         )
     form_overrides = dict(
@@ -949,7 +954,6 @@ class SolutionAdmin(ModelView, model=Solution):
         Solution.features, Solution.why_us, Solution.faqs, Solution.related_products, Solution.trusted_by
     ]
     
-    # Fix Detail View Image Rendering
     column_formatters_detail = {
         Solution.hero_image: format_image_preview,
         Solution.cta_image: format_image_preview
@@ -1182,7 +1186,6 @@ class ServicePageAdmin(ModelView, model=ServicePage):
         ServicePage.offerings, ServicePage.methodologies, ServicePage.competencies
     ]
     
-    # Fix Detail View Image Rendering
     column_formatters_detail = {
         ServicePage.hero_bg_image: format_image_preview
     }
@@ -1490,13 +1493,19 @@ class PromoAdmin(ModelView, model=Promo):
             render_kw={"class": "form-control", "rows": 4, "style": "width: 100%;"}
         ),
         idle_bg_color=dict(label="Idle Bg Color", widget=ColorPickerWithHexWidget()),
-        scroll_bg_color=dict(label="Scroll Bg Color", widget=ColorPickerWithHexWidget())
+        scroll_bg_color=dict(label="Scroll Bg Color", widget=ColorPickerWithHexWidget()),
+        illustration_url=dict(label="Minta Demo Image"),
+        image_url=dict(label="Hubungi Kami Image")
     )
+
+    column_labels = {
+        Promo.illustration_url: "Minta Demo Image",
+        Promo.image_url: "Hubungi Kami Image"
+    }
 
     async def on_model_change(self, data: dict, model: Promo, is_created: bool, request: Request) -> None:
         db = SessionLocal()
         try:
-            # 1. Title Uniqueness Check
             title = data.get("title")
             if title:
                 title_query = db.query(Promo).filter(Promo.title == title)
@@ -1506,7 +1515,6 @@ class PromoAdmin(ModelView, model=Promo):
                 if title_query.first():
                     raise Exception(f"Validation Error: A promo with the title '{title}' already exists.")
 
-            # 2. Active Promo Uniqueness Check
             if data.get("is_active") is True:
                 active_query = db.query(Promo).filter(Promo.is_active == True)
                 if not is_created:
@@ -1516,9 +1524,11 @@ class PromoAdmin(ModelView, model=Promo):
                 if active_exists:
                     raise Exception(f"Validation Error: Another promo ('{active_exists.title}') is already active. Only one should be active at a time.")
 
-            # 3. Features cleanup for 'hubungi-kami'
             if data.get("cta_link") == "hubungi-kami":
                 model.features = []
+                model.illustration_url = ""
+            elif data.get("cta_link") == "minta-demo":
+                model.image_url = ""
         finally:
             db.close()
 
@@ -1534,7 +1544,6 @@ class PromoAdmin(ModelView, model=Promo):
         return request.session.get("role") == "admin"
 
 def setup_admin(app, engine):
-    # Use absolute path for templates directory
     templates_path = str(Path(__file__).resolve().parent.parent.parent / "templates")
     
     admin = Admin(

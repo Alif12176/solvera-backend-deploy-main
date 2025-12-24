@@ -89,7 +89,7 @@ app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"]
 app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
 app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"])
 app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) 
-app.include_router(promo_v1.router, prefix=settings.API_V1_PREFIX, tags=["Marketing"]) 
+app.include_router(promo_v1.router, prefix=f"{settings.API_V1_PREFIX}/marketing-promo", tags=["Marketing"]) 
 app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
