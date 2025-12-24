@@ -4,7 +4,7 @@ from app.db.session import SessionLocal
 from app.services import promo_service
 from app.schemas.v1.promo_schema import PromoOut
 
-router = APIRouter()
+router = APIRouter(prefix="/marketing-promo", tags=["Marketing"])
 
 def get_db():
     db = SessionLocal()
