@@ -15,6 +15,7 @@ from app.core.security import verify_password, get_password_hash
 from app.db.session import SessionLocal
 
 from app.models.product import Product, ProductFeature, ProductWhyUs, ProductFAQ, ProductSocialTrustLink
+from sqlalchemy.orm import load_only
 from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, SolutionRelatedProduct, SolutionFAQ, SolutionSocialTrustLink
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
@@ -224,8 +225,8 @@ def format_relation_link(model, attribute):
 def format_image_preview(model, attribute):
     url = getattr(model, attribute)
     if not url:
-        return ""
-    return Markup(f'<img src="{url}" height="40" style="border-radius: 4px; border: 1px solid #eee; background: white;" />')
+        return Markup('<span style="color: #9ca3af; font-size: 0.8rem;">No Image</span>')
+    return Markup(f'<img src="{url}" height="40" width="40" style="border-radius: 4px; border: 1px solid #eee; background: white; object-fit: cover;" loading="lazy" />')
 
 def format_long_text(model, attribute):
     value = getattr(model, attribute)
@@ -429,6 +430,16 @@ class ArticleAdmin(ModelView, model=Article):
     
     form_excluded_columns = [Article.created_at, Article.updated_at]
 
+    def list_query(self, request):
+        """Optimize list query by deferring large text fields"""
+        query = super().list_query(request)
+        return query.options(
+            # Defer large text fields to save bandwidth
+            # They will still be loaded on-demand if accessed (which list view doesn't)
+            # or in detail view where they are needed
+            load_only(Article.id, Article.title, Article.slug, Article.publisher_id, Article.published_at, Article.image_url)
+        )
+
     form_ajax_refs = {
         "publisher": { "fields": ["name"], "order_by": "name", "placeholder": "Select Author..." },
         "categories": { "fields": ["name"], "order_by": "name", "placeholder": "Add Categories..." }
@@ -617,10 +628,29 @@ class ProductAdmin(ModelView, model=Product):
     name_plural = "Products"
     icon = "fa-solid fa-box-open"
     
-    column_list = [Product.name, Product.slug, Product.category, Product.updated_at]
+    column_list = [Product.hero_image, Product.name, Product.slug, Product.category]
     
     column_searchable_list = [Product.name, Product.slug, Product.hero_title]
     form_excluded_columns = [Product.created_at, Product.updated_at, Product.features, Product.why_us, Product.faqs, Product.trusted_by]
+    
+    # Fix Detail View Image Rendering
+    column_formatters_detail = {
+        Product.hero_image: format_image_preview
+    }
+
+    def list_query(self, request):
+        """Aggressively defer fields for bandwidth optimization"""
+        query = super().list_query(request)
+        return query.options(
+             load_only(
+                Product.id, 
+                Product.name, 
+                Product.slug, 
+                Product.category, 
+                Product.hero_image,
+                Product.updated_at # Still needed for sorting potentially
+             )
+        )
     form_overrides = dict(
         hero_subtitle=TextAreaField, 
         id=HiddenField,
@@ -805,13 +835,32 @@ class SolutionAdmin(ModelView, model=Solution):
     name = "Solution Page"
     name_plural = "Solutions"
     icon = "fa-solid fa-puzzle-piece"
-    column_list = [Solution.name, Solution.category, Solution.slug]
+    column_list = [Solution.hero_image, Solution.name, Solution.category, Solution.slug]
     column_searchable_list = [Solution.name, Solution.hero_title]
     
     form_excluded_columns = [
         Solution.created_at, Solution.updated_at, 
         Solution.features, Solution.why_us, Solution.faqs, Solution.related_products, Solution.trusted_by
     ]
+    
+    # Fix Detail View Image Rendering
+    column_formatters_detail = {
+        Solution.hero_image: format_image_preview,
+        Solution.cta_image: format_image_preview
+    }
+
+    def list_query(self, request):
+        """Aggressively defer fields for bandwidth optimization"""
+        query = super().list_query(request)
+        return query.options(
+             load_only(
+                Solution.id, 
+                Solution.name, 
+                Solution.category, 
+                Solution.slug, 
+                Solution.hero_image
+             )
+        )
     
     form_overrides = dict(
         hero_subtitle=TextAreaField,
@@ -936,15 +985,18 @@ class SolutionRelatedProductAdmin(ModelView, model=SolutionRelatedProduct):
     icon = "fa-solid fa-link"
 
     column_list = [
+        SolutionRelatedProduct.icon_url,
         SolutionRelatedProduct.solution, 
         SolutionRelatedProduct.product, 
-        SolutionRelatedProduct.icon_url, 
         SolutionRelatedProduct.sequence
     ]
     column_searchable_list = ["solution.name", "product.name"]
     column_formatters = { 
         SolutionRelatedProduct.solution: format_relation_link,
         SolutionRelatedProduct.product: format_relation_link,
+        SolutionRelatedProduct.icon_url: format_image_preview
+    }
+    column_formatters_detail = {
         SolutionRelatedProduct.icon_url: format_image_preview
     }
     column_labels = {
@@ -1015,7 +1067,7 @@ class ServicePageAdmin(ModelView, model=ServicePage):
     name = "Service Landing Page"
     icon = "fa-solid fa-layer-group"
     
-    column_list = [ServicePage.page_name, ServicePage.slug, ServicePage.updated_at]
+    column_list = [ServicePage.hero_bg_image, ServicePage.page_name, ServicePage.slug]
     column_searchable_list = [ServicePage.page_name, ServicePage.slug, ServicePage.hero_heading]
     
     form_excluded_columns = [
@@ -1023,6 +1075,23 @@ class ServicePageAdmin(ModelView, model=ServicePage):
         ServicePage.focus_items, ServicePage.quick_steps, 
         ServicePage.offerings, ServicePage.methodologies, ServicePage.competencies
     ]
+    
+    # Fix Detail View Image Rendering
+    column_formatters_detail = {
+        ServicePage.hero_bg_image: format_image_preview
+    }
+
+    def list_query(self, request):
+        """Aggressively defer fields for bandwidth optimization"""
+        query = super().list_query(request)
+        return query.options(
+             load_only(
+                ServicePage.page_name, 
+                ServicePage.slug, 
+                ServicePage.hero_bg_image,
+                ServicePage.updated_at
+             )
+        )
     
     form_overrides = dict(
         hero_tagline=TextAreaField,
@@ -1104,7 +1173,7 @@ class ServiceFocusItemAdmin(ModelView, model=ServiceFocusItem):
     name = "Focus Grid Item"
     icon = "fa-solid fa-border-all"
     
-    column_list = [ServiceFocusItem.service_page, ServiceFocusItem.card_title, ServiceFocusItem.display_order]
+    column_list = [ServiceFocusItem.icon_image, ServiceFocusItem.service_page, ServiceFocusItem.card_title, ServiceFocusItem.display_order]
     column_searchable_list = ["service_page.page_name", ServiceFocusItem.card_title, ServiceFocusItem.card_desc]
     
     form_excluded_columns = [ServiceFocusItem.id]
@@ -1176,7 +1245,7 @@ class ServiceOfferingAdmin(ModelView, model=ServiceOffering):
     name = "Offering Package"
     icon = "fa-solid fa-box-open"
     
-    column_list = [ServiceOffering.service_page, ServiceOffering.title, ServiceOffering.display_order]
+    column_list = [ServiceOffering.icon_image, ServiceOffering.service_page, ServiceOffering.title, ServiceOffering.display_order]
     column_searchable_list = ["service_page.page_name", ServiceOffering.title, ServiceOffering.description]
     
     form_excluded_columns = [ServiceOffering.id]
@@ -1220,7 +1289,7 @@ class ServiceMethodologyAdmin(ModelView, model=ServiceMethodology):
     name = "Methodology / Role"
     icon = "fa-solid fa-timeline"
     
-    column_list = [ServiceMethodology.service_page, ServiceMethodology.phase_title, ServiceMethodology.phase_order]
+    column_list = [ServiceMethodology.icon_image, ServiceMethodology.service_page, ServiceMethodology.phase_title, ServiceMethodology.phase_order]
     column_searchable_list = ["service_page.page_name", ServiceMethodology.phase_title, ServiceMethodology.phase_desc]
     
     form_excluded_columns = [ServiceMethodology.id]

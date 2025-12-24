@@ -1,0 +1,299 @@
+{% extends "sqladmin/base.html" %}
+
+{% block head %}
+{{ super() }}
+<style>
+  :root {
+    --primary-bg: #f3f4f6;
+    --card-bg: #ffffff;
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
+    --border-color: #e5e7eb;
+    --primary-color: #3b82f6;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+  }
+
+  body {
+    background-color: var(--primary-bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--text-main);
+  }
+
+  .navbar-vertical {
+    background: #111827 !important;
+    border-right: 1px solid #374151;
+  }
+
+  .navbar-brand-autodark {
+    color: white !important;
+    padding: 1.5rem 1rem;
+  }
+
+  .card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    background: var(--card-bg);
+    margin-bottom: 1.5rem;
+  }
+
+  .table-responsive {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .table thead th {
+    background: #f9fafb;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 2px solid var(--border-color);
+    padding: 0.75rem 1.5rem;
+  }
+
+  .table tbody td {
+    padding: 0.75rem 1rem;
+    vertical-align: middle;
+    color: var(--text-main);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+    max-width: 250px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Exceptions for image columns so they don't get crushed */
+  .table tbody td:has(img) {
+    max-width: none;
+    width: 60px;
+  }
+
+  .btn {
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+  }
+
+  .btn-primary:hover {
+    background-color: #2563eb;
+  }
+
+  /* Image Preview in Tables */
+  td img {
+    border-radius: var(--radius-md);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease-in-out;
+    object-fit: cover;
+    background: #f3f4f6;
+  }
+
+  td img:hover {
+    transform: scale(2.5);
+    z-index: 50;
+    position: relative;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    cursor: zoom-in;
+  }
+
+  /* Form Modernization */
+  .form-control {
+    border-radius: var(--radius-md);
+    border: 1px solid #d1d5db;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  .page-header {
+    margin-bottom: 2rem;
+  }
+
+  .page-title {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .page-pretitle {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  /* Lightbox Modal */
+  #image-lightbox {
+    display: none;
+    position: fixed;
+    z-index: 99999;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    overflow: auto;
+    justify-content: center;
+    align-items: center;
+    animation: fadeIn 0.2s;
+    backdrop-filter: blur(5px);
+  }
+
+  #image-lightbox img {
+    margin: auto;
+    display: block;
+    max-width: 90%;
+    max-height: 90vh;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    animation: zoomIn 0.3s;
+  }
+
+  #image-lightbox .close-btn {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    transition: 0.3s;
+    cursor: pointer;
+  }
+
+  #image-lightbox .close-btn:hover,
+  #image-lightbox .close-btn:focus {
+    color: #bbb;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes zoomIn {
+    from {
+      transform: scale(0.9);
+    }
+
+    to {
+      transform: scale(1);
+    }
+  }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+{% endblock %}
+
+{% from 'sqladmin/_macros.html' import display_menu %}
+{% block body %}
+<div class="wrapper">
+  <aside class="navbar navbar-expand-lg navbar-vertical navbar-expand-md navbar-dark">
+    <div class="container-fluid">
+      <h1 class="navbar-brand navbar-brand-autodark">
+        <a href="{{ url_for('admin:index') }}">
+          {% if admin.logo_url %}
+          <img src="{{ admin.logo_url }}" width="64" height="64" alt="Admin" class="navbar-brand-image" />
+          {% else %}
+          <h3>{{ admin.title }}</h3>
+          {% endif %}
+        </a>
+      </h1>
+      <nav class="navbar navbar-expand-sm" id="navbar-menu">
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+          aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          {{ display_menu(admin._menu, request) }}
+        </div>
+      </nav>
+      {% if admin.authentication_backend %}
+      <a href="{{ request.url_for('admin:logout') }}" class="btn btn-secondary btn-icon">
+        <i class="fa fa-sign-out"></i>
+        <span>Logout</span>
+      </a>
+      {% endif %}
+    </div>
+  </aside>
+  <div class="page-wrapper">
+    <div class="container-fluid">
+      <div class="page-header d-print-none">
+        {% block content_header %}
+        <div class="row align-items-center">
+          <div class="col">
+            <h2 class="page-title">{{ title }}</h2>
+            <div class="page-pretitle">{{ subtitle }}</div>
+          </div>
+        </div>
+        {% endblock %}
+      </div>
+    </div>
+    <div class="page-body flex-grow-1">
+      <div class="container-fluid">
+        <div class="row row-deck row-cards">
+          {% block content %} {% endblock %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox Container -->
+<div id="image-lightbox">
+  <span class="close-btn">&times;</span>
+  <img id="lightbox-img">
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // --- Lightbox Logic ---
+    const lightbox = document.getElementById('image-lightbox');
+    const lightboxImg = document.getElementById('lightbox-img');
+    const closeBtn = document.querySelector('.close-btn');
+
+    // Close on X click
+    if (closeBtn) {
+      closeBtn.onclick = function () {
+        lightbox.style.display = "none";
+      }
+    }
+
+    // Close on background click
+    if (lightbox) {
+      lightbox.onclick = function (e) {
+        if (e.target === lightbox) {
+          lightbox.style.display = "none";
+        }
+      }
+    }
+
+    // Delegate click for table images
+    document.body.addEventListener('click', function (e) {
+      if (e.target.tagName === 'IMG' && e.target.closest('td')) {
+        // It's an image inside a table cell (admin list view)
+        const src = e.target.getAttribute('src');
+        if (src) {
+          lightbox.style.display = "flex";
+          lightboxImg.src = src;
+        }
+      }
+    });
+  });
+</script>
+{% endblock %}
