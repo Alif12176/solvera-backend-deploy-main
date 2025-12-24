@@ -2,13 +2,14 @@ from sqladmin import Admin, ModelView
 from sqladmin.authentication import AuthenticationBackend
 from starlette.requests import Request
 from wtforms import TextAreaField, PasswordField, SelectField, StringField, DateTimeField, HiddenField, IntegerField
-from wtforms.widgets import TextArea, Input
+from wtforms.widgets import TextArea, Input, TextInput
 from wtforms.validators import Optional, DataRequired, ValidationError
 from markupsafe import Markup
 import re
 import uuid
 import html
 from datetime import datetime
+from pathlib import Path
 
 from app.core.config import settings 
 from app.core.security import verify_password, get_password_hash
@@ -20,6 +21,7 @@ from app.models.solutions import Solution, SolutionFeature, SolutionWhyUs, Solut
 from app.models.blog import Article, Author, Category, User
 from app.models.social_trust import SocialTrust
 from app.models.service import ServicePage, ServiceFocusItem, ServiceQuickStep, ServiceOffering, ServiceMethodology, ServiceCompetency
+from app.models.promo import Promo
 
 class RangeSliderWidget(Input):
     input_type = "range"
@@ -65,6 +67,54 @@ class RangeSliderWidget(Input):
         
         return Markup(f'<div style="display: flex; align-items: center; width: 100%;">{range_input}{number_input}</div>{script}')
 
+class ColorPickerWithHexWidget(Input):
+    def __call__(self, field, **kwargs):
+        kwargs.setdefault("id", field.id)
+        kwargs.setdefault("name", field.name)
+        value = field.data if field.data else "#000000"
+        
+        color_id = f"{field.id}_picker"
+        text_id = field.id
+        
+        color_input = f"""
+        <input type="color" id="{color_id}" 
+               value="{value}" 
+               style="width: 50px; height: 38px; padding: 2px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;"
+               class="form-control form-control-color">
+        """
+        
+        text_input = f"""
+        <input type="text" id="{text_id}" name="{field.name}"
+               value="{value}" 
+               placeholder="#000000"
+               style="width: 120px; margin-left: 10px; font-family: monospace; text-transform: uppercase;" 
+               class="form-control">
+        """
+        
+        script = f"""
+        <script>
+            (function() {{
+                var color = document.getElementById('{color_id}');
+                var text = document.getElementById('{text_id}');
+                
+                if(color && text) {{
+                    color.addEventListener('input', function() {{
+                        text.value = color.value.toUpperCase();
+                    }});
+                    
+                    text.addEventListener('input', function() {{
+                        var val = text.value;
+                        if(/^#[0-9A-F]{{6}}$/i.test(val)) {{
+                            color.value = val;
+                        }}
+                    }});
+                }}
+            }})();
+        </script>
+        """
+        
+        return Markup(f'<div style="display: flex; align-items: center;">{color_input}{text_input}</div>{script}')
+
 def unique_article_title_validator(form, field):
     db = SessionLocal()
     try:
@@ -108,6 +158,67 @@ def unique_article_title_validator(form, field):
             raise ValidationError(f"An article with the title '{field.data}' already exists.")
     finally:
         db.close()
+
+# Removed WTOForms validators for Promo to use 'Nuclear' method in on_model_change
+
+# Removed PromoPreviewWidget as per user request
+
+
+class DynamicCTAWidget(SelectField.widget.__class__):
+    def __call__(self, field, **kwargs):
+        html_content = super().__call__(field, **kwargs)
+        
+        script = f"""
+        <style>
+            /* Maintain horizontal alignment for Subtitle and Features fields */
+            .mb-3:has(textarea) {{
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-start !important;
+            }}
+            .mb-3:has(textarea) label {{
+                flex: 0 0 16.666667%;
+                max-width: 16.666667%;
+                padding-top: 8px;
+            }}
+            .mb-3:has(textarea) > div {{
+                flex: 0 0 83.333333%;
+                max-width: 83.333333%;
+            }}
+        </style>
+        <script>
+            (function() {{
+                const ctaSelect = document.getElementById('{field.id}');
+                
+                function toggleFields() {{
+                    if (!ctaSelect) return;
+                    
+                    const featuresInput = document.getElementById('features') || document.querySelector('[name="features"]');
+                    const featuresField = featuresInput ? featuresInput.closest('.mb-3, .form-group, .col-md-10') : null;
+                    
+                    if (featuresField && featuresInput) {{
+                        if (ctaSelect.value === 'hubungi-kami') {{
+                            featuresField.style.display = 'none';
+                            featuresInput.value = '';
+                            featuresInput.disabled = true;
+                        }} else {{
+                            featuresField.style.display = 'block';
+                            featuresInput.disabled = false;
+                        }}
+                    }}
+                }}
+                
+                if (ctaSelect) {{
+                    ctaSelect.addEventListener('change', toggleFields);
+                    // Initial check with repeated attempts for dynamic rendering
+                    for (let delay of [100, 500, 1000, 2000]) {{
+                        setTimeout(toggleFields, delay);
+                    }}
+                }}
+            }})();
+        </script>
+        """
+        return Markup(f"{html_content}{script}")
 
 class QuillEditorWidget(TextArea):
     def __call__(self, field, **kwargs):
@@ -1355,13 +1466,88 @@ class ServiceCompetencyAdmin(ModelView, model=ServiceCompetency):
     def is_visible(self, request: Request) -> bool:
         return request.session.get("role") == "admin"
 
+class PromoAdmin(ModelView, model=Promo):
+    category = "Marketing"
+    name = "Promo Event"
+    name_plural = "Promos"
+    icon = "fa-solid fa-bullhorn"
+
+    column_list = [Promo.title, Promo.is_active, Promo.cta_link]
+    form_excluded_columns = [Promo.id, Promo.created_at, Promo.updated_at]
+
+    form_overrides = dict(
+        subtitle=TextAreaField,
+        features=LineSeparatedListField,
+        cta_link=SelectField
+    )
+
+    form_args = dict(
+        title=dict(validators=[DataRequired()]),
+        is_active=dict(validators=[Optional()]),
+        cta_link=dict(
+            choices=[("hubungi-kami", "Hubungi Kami"), ("minta-demo", "Minta Demo")],
+            label="CTA Destination",
+            widget=DynamicCTAWidget()
+        ),
+        features=dict(
+            label="Features",
+            description="Enter each feature on a new line (one feature per line).",
+            render_kw={"class": "form-control", "rows": 4, "style": "width: 100%;"}
+        ),
+        idle_bg_color=dict(label="Idle Bg Color", widget=ColorPickerWithHexWidget()),
+        scroll_bg_color=dict(label="Scroll Bg Color", widget=ColorPickerWithHexWidget())
+    )
+
+    async def on_model_change(self, data: dict, model: Promo, is_created: bool, request: Request) -> None:
+        db = SessionLocal()
+        try:
+            # 1. Title Uniqueness Check
+            title = data.get("title")
+            if title:
+                title_query = db.query(Promo).filter(Promo.title == title)
+                if not is_created:
+                    title_query = title_query.filter(Promo.id != model.id)
+                
+                if title_query.first():
+                    raise Exception(f"Validation Error: A promo with the title '{title}' already exists.")
+
+            # 2. Active Promo Uniqueness Check
+            if data.get("is_active") is True:
+                active_query = db.query(Promo).filter(Promo.is_active == True)
+                if not is_created:
+                    active_query = active_query.filter(Promo.id != model.id)
+                
+                active_exists = active_query.first()
+                if active_exists:
+                    raise Exception(f"Validation Error: Another promo ('{active_exists.title}') is already active. Only one should be active at a time.")
+
+            # 3. Features cleanup for 'hubungi-kami'
+            if data.get("cta_link") == "hubungi-kami":
+                model.features = []
+        finally:
+            db.close()
+
+    column_formatters = {
+        Promo.illustration_url: format_image_preview,
+        Promo.image_url: format_image_preview
+    }
+
+    def is_accessible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
+    def is_visible(self, request: Request) -> bool:
+        return request.session.get("role") == "admin"
+
 def setup_admin(app, engine):
+    # Use absolute path for templates directory
+    templates_path = str(Path(__file__).resolve().parent.parent.parent / "templates")
+    
     admin = Admin(
         app, 
         engine, 
         authentication_backend=authentication_backend,
         title="Content Management System",
-        templates_dir="templates"
+        templates_dir=templates_path
     )
 
     admin.add_view(UserAdmin)
@@ -1390,5 +1576,6 @@ def setup_admin(app, engine):
     admin.add_view(ServiceOfferingAdmin)
     admin.add_view(ServiceMethodologyAdmin)
     admin.add_view(ServiceCompetencyAdmin)
+    admin.add_view(PromoAdmin)
 
     return admin

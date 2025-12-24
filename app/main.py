@@ -11,9 +11,16 @@ from app.routers.v1 import blog as blog_v1
 from app.routers.v1 import solution as solution_v1
 from app.routers.v1 import social_trust as social_trust_v1
 from app.routers.v1 import service as service_v1
+from app.routers.v1 import promo as promo_v1
 from app.routers.v1 import cron    
-from app.db.session import engine
+from app.db.session import engine, SessionLocal
 from app.core.config import settings
+import time
+from sqlalchemy import func
+from app.models.solutions import Solution
+from app.models.service import ServicePage
+from app.models.product import Product
+from app.models.blog import Article, Author
 from app.core.admin import (
     authentication_backend,
     UserAdmin,
@@ -21,7 +28,8 @@ from app.core.admin import (
     SolutionAdmin, SolutionFeatureAdmin, SolutionWhyUsAdmin, SolutionFAQAdmin, SolutionRelatedProductAdmin, SolutionSocialTrustLinkAdmin,
     ArticleAdmin, AuthorAdmin, CategoryAdmin,
     SocialTrustAdmin,
-    ServicePageAdmin, ServiceFocusItemAdmin, ServiceQuickStepAdmin, ServiceOfferingAdmin, ServiceMethodologyAdmin, ServiceCompetencyAdmin
+    ServicePageAdmin, ServiceFocusItemAdmin, ServiceQuickStepAdmin, ServiceOfferingAdmin, ServiceMethodologyAdmin, ServiceCompetencyAdmin,
+    PromoAdmin
 )
 
 tags_metadata = [
@@ -81,6 +89,7 @@ app.include_router(blog_v1.router, prefix=settings.API_V1_PREFIX, tags=["Blogs"]
 app.include_router(social_trust_v1.router, prefix=settings.API_V1_PREFIX, tags=["Social Trust"])
 app.include_router(service_v1.router, prefix=settings.API_V1_PREFIX, tags=["Services"])
 app.include_router(solution_v1.router, prefix=settings.API_V1_PREFIX, tags=["Solutions"]) 
+app.include_router(promo_v1.router, prefix=settings.API_V1_PREFIX, tags=["Marketing"]) 
 app.include_router(cron.router, prefix="/api/cron", tags=["Cron Jobs"])
 
 admin = Admin(app, engine, authentication_backend=authentication_backend)
@@ -106,6 +115,7 @@ admin.add_view(ServiceQuickStepAdmin)
 admin.add_view(ServiceOfferingAdmin)
 admin.add_view(ServiceMethodologyAdmin)
 admin.add_view(ServiceCompetencyAdmin)
+admin.add_view(PromoAdmin)
 
 admin.add_view(ArticleAdmin)
 admin.add_view(AuthorAdmin)
@@ -140,6 +150,63 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
             }
         },
     )
+
+@app.get("/api/admin/stats", tags=["General"])
+async def get_admin_stats(request: Request):
+    db = SessionLocal()
+    start_time = time.time()
+    try:
+        role = request.session.get("role")
+        user_id = request.session.get("user_id")
+
+        if role == "admin":
+            articles_count = db.query(func.count(Article.id)).scalar()
+            products_count = db.query(func.count(Product.id)).scalar()
+            solutions_count = db.query(func.count(Solution.id)).scalar()
+            services_count = db.query(func.count(ServicePage.id)).scalar()
+            
+            latency = (time.time() - start_time) * 1000
+            
+            return {
+                "success": True,
+                "role": "admin",
+                "articles": articles_count,
+                "products": products_count,
+                "solutions": solutions_count,
+                "services": services_count,
+                "db_health": {
+                    "status": "Healthy",
+                    "latency_ms": round(latency, 2),
+                    "last_check": time.time()
+                }
+            }
+        elif role == "editor":
+            author = db.query(Author).filter(Author.user_id == user_id).first()
+            articles_data = []
+            if author:
+                articles = db.query(Article).filter(Article.publisher_id == author.id).order_by(Article.created_at.desc()).limit(10).all()
+                for art in articles:
+                    articles_data.append({
+                        "id": str(art.id),
+                        "title": art.title,
+                        "published_at": art.published_at.isoformat() if art.published_at else None,
+                        "created_at": art.created_at.isoformat()
+                    })
+            
+            return {
+                "success": True,
+                "role": "editor",
+                "articles": articles_data
+            }
+        
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
+        )
+    finally:
+        db.close()
 
 @app.get("/", tags=["General"])
 async def root():

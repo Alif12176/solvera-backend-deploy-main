@@ -1,0 +1,501 @@
+{% extends "sqladmin/layout.html" %}
+
+{% block content %}
+<style>
+    /* Premium Minimalist Design System */
+    :root {
+        --dash-bg: #f8fafc;
+        --card-bg: #ffffff;
+        --border-color: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --accent-blue: #3b82f6;
+    }
+
+    .welcome-container {
+        padding: 2rem 1.5rem 2rem 3rem;
+        max-width: 1500px;
+        margin: 0;
+    }
+
+    .page-header {
+        margin-bottom: 2rem;
+    }
+
+    .welcome-text {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: var(--text-main);
+        letter-spacing: -0.025em;
+        margin-bottom: 0.5rem;
+    }
+
+    .welcome-subtext {
+        font-size: 1.1rem;
+        color: var(--text-muted);
+    }
+
+
+    /* Stat Cards */
+    .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 2rem;
+        height: 100%;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        border-color: #cbd5e1;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+    }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        margin-bottom: 1.25rem;
+        display: inline-block;
+    }
+
+    .stat-value {
+        font-size: 2.75rem;
+        font-weight: 800;
+        color: var(--text-main);
+        line-height: 1;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    /* Action Cards */
+    .action-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.75rem;
+        text-decoration: none !important;
+        color: inherit !important;
+        display: flex;
+        align-items: center;
+        gap: 1.5rem;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+
+    .action-card:hover {
+        border-color: var(--accent-blue);
+        background: #fbfcfe;
+        transform: scale(1.02);
+        box-shadow: 0 12px 20px -8px rgba(59, 130, 246, 0.08);
+    }
+
+    .action-icon-box {
+        width: 60px;
+        height: 60px;
+        background: #f1f5f9;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+    }
+
+    .action-card:hover .action-icon-box {
+        background: #e0e7ff;
+    }
+
+    .action-info h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+
+    .action-info p {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    /* Health Check Widget */
+    .health-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 1.25rem;
+        border-radius: 99px;
+        background: #f8fafc;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-main);
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+
+    .pulse-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+        transition: background-color 0.3s ease;
+    }
+
+    .status-checking {
+        background: #f59e0b !important;
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+        animation: pulse-yellow 2s infinite;
+    }
+
+    .status-healthy {
+        background: #10b981 !important;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse-green 2s infinite;
+    }
+
+    .status-error {
+        background: #ef4444 !important;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        animation: pulse-red 2s infinite;
+    }
+
+    @keyframes pulse-yellow {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7);
+        }
+
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+        }
+
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+        }
+    }
+
+    @keyframes pulse-green {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        }
+
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+        }
+
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+        }
+    }
+
+    @keyframes pulse-red {
+        0% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+        }
+
+        70% {
+            transform: scale(1);
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+        }
+
+        100% {
+            transform: scale(0.95);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+        }
+    }
+
+    /* Animation Utilities */
+    .fade-up {
+        animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        opacity: 0;
+    }
+
+    .delay-1 {
+        animation-delay: 0.1s;
+    }
+
+    .delay-2 {
+        animation-delay: 0.2s;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes slideInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+<div class="welcome-container container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 page-header fade-up">
+            <h1 class="welcome-text">
+                {% if request.session.get('role') == 'admin' %}
+                Welcome, Master {{ request.session.get('username', 'User') }}
+                {% elif request.session.get('role') == 'editor' %}
+                Welcome, Editor {{ request.session.get('username', 'User') }}
+                {% endif %}
+            </h1>
+            <div class="d-flex align-items-center gap-3">
+                <p class="welcome-subtext mb-0">
+                    {% if request.session.get('role') == 'admin' %}
+                    Manage your platform's content and monitor database health.
+                    {% else %}
+                    Manage your content and track your published articles.
+                    {% endif %}
+                </p>
+                {% if request.session.get('role') == 'admin' %}
+                <div class="health-badge">
+                    <span class="pulse-dot status-checking" id="health-dot"></span>
+                    <span id="db-status-text">Checking Database...</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if request.session.get('role') == 'admin' %}
+
+    <div id="admin-dashboard">
+        <div class="row mb-4">
+            <div class="col-12 fade-up delay-1">
+                <span class="section-title">Database Overview</span>
+            </div>
+        </div>
+        <div class="row mb-5">
+            <div class="col-md-6 col-lg-3 mb-4 fade-up delay-1">
+                <div class="stat-card">
+                    <span class="stat-icon">📝</span>
+                    <div class="stat-value" id="articles-count">-</div>
+                    <div class="stat-label">Articles</div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-4 fade-up delay-1">
+                <div class="stat-card">
+                    <span class="stat-icon">📦</span>
+                    <div class="stat-value" id="products-count">-</div>
+                    <div class="stat-label">Products</div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-4 fade-up delay-1">
+                <div class="stat-card">
+                    <span class="stat-icon">💡</span>
+                    <div class="stat-value" id="solutions-count">-</div>
+                    <div class="stat-label">Solutions</div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-4 fade-up delay-1">
+                <div class="stat-card">
+                    <span class="stat-icon">🛠️</span>
+                    <div class="stat-value" id="services-count">-</div>
+                    <div class="stat-label">Services</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12 fade-up delay-2">
+                <span class="section-title">Quick Management</span>
+            </div>
+        </div>
+        <div class="row g-4 fade-up delay-2">
+            <div class="col-lg-6 col-xl-3">
+                <a href="{{ url_for('admin:list', identity='article') }}" class="action-card">
+                    <div class="action-icon-box">📝</div>
+                    <div class="action-info">
+                        <h3>Articles</h3>
+                        <p>Editorial & Blog content</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-6 col-xl-3">
+                <a href="{{ url_for('admin:list', identity='product') }}" class="action-card">
+                    <div class="action-icon-box">📦</div>
+                    <div class="action-info">
+                        <h3>Products</h3>
+                        <p>Inventory & Catalog</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-6 col-xl-3">
+                <a href="{{ url_for('admin:list', identity='solution') }}" class="action-card">
+                    <div class="action-icon-box">💡</div>
+                    <div class="action-info">
+                        <h3>Solutions</h3>
+                        <p>Bespoke Business Solutions</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col-lg-6 col-xl-3">
+                <a href="{{ url_for('admin:list', identity='servicepage') }}" class="action-card">
+                    <div class="action-icon-box">🛠️</div>
+                    <div class="action-info">
+                        <h3>Services</h3>
+                        <p>Service Offerings & Details</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Promo Manager Link -->
+        <div class="row mt-5">
+            <div class="col-12 fade-up delay-2">
+                <a href="{{ url_for('admin:list', identity='promo') }}" class="action-card" style="max-width: 350px;">
+                    <div class="action-icon-box">📢</div>
+                    <div class="action-info">
+                        <h3>Promo Manager</h3>
+                        <p>Manage events and banners</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% elif request.session.get('role') == 'editor' %}
+    <div id="editor-dashboard">
+        <div class="row mb-4">
+            <div class="col-12 fade-up delay-1">
+                <span class="section-title">Your Articles</span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 fade-up delay-1">
+                <div class="editor-table-container">
+                    <table class="editor-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="editor-articles-list">
+                            <tr>
+                                <td colspan="4" class="text-center py-4">Loading your articles...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const dot = document.getElementById('health-dot');
+        const healthText = document.getElementById('db-status-text');
+
+        function setHealth(status, message) {
+            if (!dot) return;
+            dot.classList.remove('status-checking', 'status-healthy', 'status-error');
+
+            if (status === 'healthy') {
+                dot.classList.add('status-healthy');
+                if (healthText) healthText.textContent = message;
+            } else if (status === 'error') {
+                dot.classList.add('status-error');
+                if (healthText) healthText.textContent = message || 'DB Connection Error';
+            } else {
+                dot.classList.add('status-checking');
+                if (healthText) healthText.textContent = message || 'Checking Database...';
+            }
+        }
+
+        fetch('/api/admin/stats')
+            .then(res => {
+                if (!res.ok) throw new Error('Network response was not ok');
+                return res.json();
+            })
+            .then(data => {
+                if (data.success === false) throw new Error(data.error || 'Server error');
+
+                if (data.role === 'admin') {
+                    if (data.db_health) {
+                        setHealth('healthy', `DB ${data.db_health.status} (${data.db_health.latency_ms}ms)`);
+                    }
+
+
+                    const results = {
+                        'articles-count': data.articles || 0,
+                        'products-count': data.products || 0,
+                        'solutions-count': data.solutions || 0,
+                        'services-count': data.services || 0
+                    };
+
+                    Object.keys(results).forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) animateNumber(el, 0, results[id], 1200);
+                    });
+                } else if (data.role === 'editor') {
+                    const listEl = document.getElementById('editor-articles-list');
+                    if (listEl && data.articles) {
+                        if (data.articles.length === 0) {
+                            listEl.innerHTML = '<tr><td colspan="4" class="text-center py-4">No articles found.</td></tr>';
+                            return;
+                        }
+                        listEl.innerHTML = data.articles.map(art => `
+                            <tr>
+                                <td class="fw-bold">${art.title}</td>
+                                <td>${art.published_at ? '✅ Published' : '📝 Draft'}</td>
+                                <td>${new Date(art.created_at).toLocaleDateString()}</td>
+                                <td><a href="/admin/article/edit/${art.id}" class="btn btn-sm btn-link">Edit</a></td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Fetch error:', err);
+                setHealth('error', 'DB Connection Error');
+            });
+    });
+
+    function animateNumber(element, start, end, duration) {
+        let startTime = null;
+        function update(currentTime) {
+            if (!startTime) startTime = currentTime;
+            const progress = Math.min((currentTime - startTime) / duration, 1);
+            const val = Math.floor(progress * (end - start) + start);
+            element.textContent = val;
+            if (progress < 1) requestAnimationFrame(update);
+        }
+        requestAnimationFrame(update);
+    }
+</script>
+{% endblock %}
