@@ -264,11 +264,7 @@
     <div class="row mb-4">
         <div class="col-12 page-header fade-up">
             <h1 class="welcome-text">
-                {% if request.session.get('role') == 'admin' %}
-                Welcome, Master {{ request.session.get('username', 'User') }}
-                {% elif request.session.get('role') == 'editor' %}
-                Welcome, Editor {{ request.session.get('username', 'User') }}
-                {% endif %}
+                Welcome, {{ request.session.get('username', 'User') }}
             </h1>
             <div class="d-flex align-items-center gap-3">
                 <p class="welcome-subtext mb-0">

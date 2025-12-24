@@ -159,11 +159,6 @@ def unique_article_title_validator(form, field):
     finally:
         db.close()
 
-# Removed WTOForms validators for Promo to use 'Nuclear' method in on_model_change
-
-# Removed PromoPreviewWidget as per user request
-
-
 class DynamicCTAWidget(SelectField.widget.__class__):
     def __call__(self, field, **kwargs):
         html_content = super().__call__(field, **kwargs)

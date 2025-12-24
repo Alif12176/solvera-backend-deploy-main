@@ -1,5 +1,3 @@
-# app/routers/cron.py
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.db.session import get_db
